@@ -98,29 +98,51 @@ export function resolveProjectCacheKey(modelId: string): string | null {
 // gateway reads x-opencode-session first, then converts that sticky identifier
 // into provider-specific affinity headers such as x-session-affinity upstream.
 //
-// VS Code's provider API does not currently expose a guaranteed public session
-// identifier everywhere, so we first probe a few known internal fields and then
-// fall back to a stable hash of the first messages in the conversation. That
-// preserves sticky routing and cache affinity without depending on hidden state.
+// VS Code's provider API does not expose a stable chat-session identity
+// (microsoft/vscode#305853 — `chatSessionResource` proposed, not shipped), so
+// we probe known internal option fields and fall back to a memoized anchor
+// hash. The anchor covers ONLY the first message + sorted tool names + model:
+// history trimming rewrites messages[1..N] by design, so hashing the first 3
+// messages would shift the session id on every trim and break sticky routing
+// + prefix-cache affinity. Memoization keeps the id constant for the life of
+// the conversation even as the tail grows.
+const sessionMemo = new Map<string, string>();
+
 export function buildOpenCodeRequestHeaders(
   messages: readonly vscode.LanguageModelChatRequestMessage[],
   options: vscode.ProvideLanguageModelChatResponseOptions,
   modelId: string,
 ): Record<string, string> {
-  const sessionId = cleanHeaderValue(
-    findStringOption(options, [
-      "sessionId",
-      "sessionID",
-      "chatSessionId",
-      "chatSessionID",
-      "conversationId",
-      "conversationID",
-      "threadId",
-      "threadID",
-      "session.id",
-      "chatSession.id",
-    ]) ?? `vscode-${stableHash(conversationAnchor(messages, modelId))}`,
-  );
+  const explicit = findStringOption(options, [
+    "sessionId",
+    "sessionID",
+    "chatSessionId",
+    "chatSessionID",
+    "conversationId",
+    "conversationID",
+    "threadId",
+    "threadID",
+    "session.id",
+    "chatSession.id",
+  ]);
+  let sessionId: string;
+  if (explicit) {
+    sessionId = cleanHeaderValue(explicit);
+  } else {
+    const anchorKey = stableConversationAnchorKey(messages, options, modelId);
+    const memoKey = `${modelId}:${anchorKey}`;
+    const memoized = sessionMemo.get(memoKey);
+    if (memoized) {
+      sessionId = memoized;
+    } else {
+      sessionId = cleanHeaderValue(`vscode-${anchorKey}`);
+      sessionMemo.set(memoKey, sessionId);
+      if (sessionMemo.size > 500) {
+        const oldest = sessionMemo.keys().next().value;
+        if (oldest) sessionMemo.delete(oldest);
+      }
+    }
+  }
   const requestId = cleanHeaderValue(
     findStringOption(options, ["requestId", "requestID", "messageId", "messageID"]) ??
       `req-${stableHash(`${String(Date.now())}-${String(Math.random())}-${sessionId}-${modelId}`)}`,
@@ -188,8 +210,28 @@ export function readPath(value: unknown, path: string[]): unknown {
 }
 
 export function conversationAnchor(messages: readonly vscode.LanguageModelChatRequestMessage[], modelId: string): string {
+  // Legacy anchor (first-3-messages) kept for compatibility; new code should
+  // use stableConversationAnchorKey which is trim-stable.
   const anchorMessages = messages.slice(0, 3).map((message) => `${String(message.role)}:${messageText(message).slice(0, 2048)}`);
   return anchorMessages.length ? anchorMessages.join("\n") : modelId;
+}
+
+/**
+ * Trim-stable conversation key: first message text + sorted tool names +
+ * model id. Messages[1..] shift on every history trim by design and must not
+ * feed the session hash (see buildOpenCodeRequestHeaders).
+ */
+export function stableConversationAnchorKey(
+  messages: readonly vscode.LanguageModelChatRequestMessage[],
+  options: vscode.ProvideLanguageModelChatResponseOptions,
+  modelId: string,
+): string {
+  const first = messages.length ? `${String(messages[0].role)}:${messageText(messages[0]).slice(0, 2048)}` : modelId;
+  const toolNames = [...(options.tools ?? [])]
+    .map((t) => t.name)
+    .sort()
+    .join(",");
+  return stableHash(`${first}\ntools:${toolNames}\nmodel:${modelId}`);
 }
 
 export function cleanHeaderValue(value: string): string {

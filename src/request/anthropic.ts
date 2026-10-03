@@ -55,17 +55,31 @@ export function buildAnthropicMessagesRequestBody(
 }
 
 export function buildAnthropicMessages(messages: ApiMessage[]): AnthropicRequestMessage[] {
-  let cacheControlCount = 0;
-  const nextCacheControl = (): { cache_control?: AnthropicCacheControl } => {
-    cacheControlCount += 1;
-    return cacheControlCount <= 4 ? { cache_control: { type: "ephemeral" } } : {};
+  // Cache-stable breakpoints: at most 2 marks at structural boundaries —
+  // (1) end of the first (anchor/static-prefix) message and (2) end of the
+  // message before the latest user turn (growing-tail checkpoint). Per-block
+  // marking (first-4-blocks) shifted every later breakpoint whenever any
+  // earlier turn gained a text/image part, and exhausted the 4-slot budget
+  // that gateways may also inject into. Writes happen only at breakpoints and
+  // reads walk back max 20 blocks, so these two positions cover both the
+  // static prefix and the conversation tail without drift.
+  const markTargets = new Set<number>();
+  if (messages.length >= 1) markTargets.add(0);
+  if (messages.length >= 3) markTargets.add(messages.length - 2);
+  let messageIndex = 0;
+  const nextCacheControlFor = (msgIdx: number, isLastBlockOfMessage: boolean): { cache_control?: AnthropicCacheControl } => {
+    if (isLastBlockOfMessage && markTargets.has(msgIdx)) {
+      return { cache_control: { type: "ephemeral" } };
+    }
+    return {};
   };
 
   const anthropicMessages: AnthropicRequestMessage[] = [];
 
   for (const message of messages) {
+    const msgIdx = messageIndex++;
     if (message.role === "user") {
-      const userBlocks = anthropicUserBlocks(message.content, nextCacheControl);
+      const userBlocks = anthropicUserBlocks(message.content, (last) => nextCacheControlFor(msgIdx, last));
       if (userBlocks.length) {
         anthropicMessages.push({ role: "user", content: userBlocks });
       }
@@ -73,7 +87,7 @@ export function buildAnthropicMessages(messages: ApiMessage[]): AnthropicRequest
     }
 
     if (message.role === "assistant") {
-      const assistantBlocks = anthropicAssistantBlocks(message, nextCacheControl);
+      const assistantBlocks = anthropicAssistantBlocks(message, (last) => nextCacheControlFor(msgIdx, last));
       if (assistantBlocks.length) {
         anthropicMessages.push({ role: "assistant", content: assistantBlocks });
       }
@@ -88,8 +102,8 @@ export function buildAnthropicMessages(messages: ApiMessage[]): AnthropicRequest
           {
             type: "tool_result",
             tool_use_id: message.tool_call_id,
-            content: anthropicToolResultContent(message.content, nextCacheControl),
-            ...nextCacheControl(),
+            content: anthropicToolResultContent(message.content),
+            ...nextCacheControlFor(msgIdx, true),
           },
         ],
       });
@@ -99,7 +113,7 @@ export function buildAnthropicMessages(messages: ApiMessage[]): AnthropicRequest
   if (!anthropicMessages.length) {
     anthropicMessages.push({
       role: "user",
-      content: [{ type: "text", text: "Continue the conversation.", ...nextCacheControl() }],
+      content: [{ type: "text", text: "Continue the conversation." }],
     });
   }
 
@@ -108,10 +122,10 @@ export function buildAnthropicMessages(messages: ApiMessage[]): AnthropicRequest
 
 function anthropicUserBlocks(
   content: ApiMessage["content"],
-  nextCacheControl: () => { cache_control?: AnthropicCacheControl },
+  mark: (isLastBlockOfMessage: boolean) => { cache_control?: AnthropicCacheControl },
 ): AnthropicContentBlock[] {
   if (typeof content === "string") {
-    return content.trim() ? [{ type: "text", text: content, ...nextCacheControl() }] : [];
+    return content.trim() ? [{ type: "text", text: content, ...mark(true) }] : [];
   }
 
   if (!Array.isArray(content)) {
@@ -119,19 +133,25 @@ function anthropicUserBlocks(
   }
 
   const blocks: AnthropicContentBlock[] = [];
+  // Collect candidate blocks first so only the LAST block of the message
+  // carries the breakpoint — earlier blocks stay unmarked and stable.
+  const raw: AnthropicContentBlock[] = [];
   for (const part of content) {
     if (part.type === "text" && typeof part.text === "string" && part.text.length > 0) {
-      blocks.push({ type: "text", text: part.text, ...nextCacheControl() });
+      raw.push({ type: "text", text: part.text });
       continue;
     }
 
     if (part.type === "image_url") {
       const source = anthropicImageSource(part);
       if (source) {
-        blocks.push({ type: "image", source, ...nextCacheControl() });
+        raw.push({ type: "image", source });
       }
     }
   }
+  raw.forEach((block, i) => {
+    blocks.push(i === raw.length - 1 ? { ...block, ...mark(true) } : block);
+  });
 
   return blocks;
 }
@@ -142,10 +162,7 @@ function anthropicUserBlocks(
 // (text + image blocks) only when an image_url part is present. This keeps
 // text-only tool results byte-for-byte identical to the previous behavior
 // while enabling vision-capable Anthropic models to consume MCP screenshots.
-function anthropicToolResultContent(
-  content: ApiMessage["content"],
-  nextCacheControl: () => { cache_control?: AnthropicCacheControl },
-): string | AnthropicContentBlock[] {
+function anthropicToolResultContent(content: ApiMessage["content"]): string | AnthropicContentBlock[] {
   if (typeof content === "string") {
     return content;
   }
@@ -159,18 +176,18 @@ function anthropicToolResultContent(
     return joinedTextContent(content, "\n");
   }
 
-  return anthropicUserBlocks(content, nextCacheControl);
+  return anthropicUserBlocks(content, () => ({}));
 }
 
 function anthropicAssistantBlocks(
   message: ApiMessage,
-  nextCacheControl: () => { cache_control?: AnthropicCacheControl },
+  mark: (isLastBlockOfMessage: boolean) => { cache_control?: AnthropicCacheControl },
 ): AnthropicContentBlock[] {
   const blocks: AnthropicContentBlock[] = [];
 
   const text = joinedTextContent(message.content);
   if (text) {
-    blocks.push({ type: "text", text, ...nextCacheControl() });
+    blocks.push({ type: "text", text });
   }
 
   for (const toolCall of message.tool_calls ?? []) {
@@ -179,8 +196,11 @@ function anthropicAssistantBlocks(
       id: toolCall.id || `toolu_${Math.random().toString(36).slice(2)}`,
       name: toolCall.function.name,
       input: anthropicToolCallInput(toolCall.function.arguments),
-      ...nextCacheControl(),
     });
+  }
+  if (blocks.length) {
+    const last = blocks.length - 1;
+    blocks[last] = { ...blocks[last], ...mark(true) };
   }
 
   return blocks;

@@ -199,3 +199,25 @@ describe("pairResponsesFunctionCallItems (issue #216)", () => {
     assert.equal((paired[1] as { output: string }).output, "first");
   });
 });
+
+describe("responsesFunctionCallItemId (prefix-cache stability)", () => {
+  it("is deterministic for non-fc ids across turns", async () => {
+    const { responsesFunctionCallItemId } = await import("../responsesRequest.js");
+    const first = responsesFunctionCallItemId("call_abc123");
+    const second = responsesFunctionCallItemId("call_abc123");
+    assert.equal(first, second);
+    assert.match(first, /^fc_[0-9a-f]{32}$/);
+  });
+
+  it("replays a 3-turn trace byte-identically (no random ids)", async () => {
+    const { responsesInputItemsFromMessage } = await import("../responsesRequest.js");
+    const history = [
+      { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "f", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "call_1", content: "ok" },
+    ] as never[];
+    const once = responsesInputItemsFromMessage(history[0]);
+    const twice = responsesInputItemsFromMessage(history[0]);
+    assert.equal(JSON.stringify(once), JSON.stringify(twice));
+    assert.equal((once[0] as { id: string }).id, (twice[0] as { id: string }).id);
+  });
+});

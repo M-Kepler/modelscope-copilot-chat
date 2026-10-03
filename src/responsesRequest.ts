@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 
 export interface ResponsesRequestEnvelopeOptions {
   model: string;
@@ -186,13 +186,18 @@ export function pairResponsesFunctionCallItems(items: Record<string, unknown>[])
 
 /**
  * Return a Responses-API-compliant `function_call` item id. Ids already in the
- * `fc_` namespace pass through unchanged; anything else (chat-completions
- * `call_*` ids, gateway ids, empty strings) is replaced with a fresh `fc_`
- * synthetic id. Deterministic per call site is not required — the id only has
- * to be valid and unique within the request.
+ * `fc_` namespace pass through unchanged (verbatim echo preserves the
+ * provider's prefix cache); anything else (chat-completions `call_*` ids,
+ * gateway ids, empty strings) maps deterministically to `fc_<sha256>` so the
+ * same history replays byte-identically on every turn. A random id per request
+ * would break the Responses prefix cache at the first tool call on every turn
+ * (cf. OpenHands SDK #2905). The `call_id` correlation id is always preserved
+ * verbatim separately — only this item `id` is namespaced.
  */
 export function responsesFunctionCallItemId(originalId: string): string {
-  return originalId.startsWith("fc_") ? originalId : `fc_${randomUUID().replace(/-/g, "")}`;
+  if (originalId.startsWith("fc_")) return originalId;
+  const digest = createHash("sha256").update(originalId, "utf8").digest("hex").slice(0, 32);
+  return `fc_${digest}`;
 }
 
 /** Narrow a union value to a content-part array without falling back to `any[]`. */
