@@ -8,7 +8,7 @@ export { thinkingFamily, thinkingProviderFor } from "./thinking/provider";
 export type { ThinkingProvider } from "./thinking/provider";
 export { resolveThinkingConfig, extractThinkingOverride, stripSchemaDefaultEcho } from "./thinking/resolve";
 export type { ResolveThinkingConfigInput } from "./thinking/resolve";
-export { schemaFromReasoningOptions, genericReasoningSchema } from "./thinking/schema";
+export { schemaFromReasoningOptions, genericReasoningSchema, GENERIC_REASONING_EFFORTS } from "./thinking/schema";
 export type { ThinkingSchema } from "./thinking/schema";
 export { bodyRequestsThinking } from "./thinking/payload";
 export { DeepSeekThinking } from "./thinking/deepseek";

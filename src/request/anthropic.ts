@@ -36,7 +36,7 @@ export function buildAnthropicMessagesRequestBody(
   const tools = mapAnthropicTools(options.tools);
   // The per-provider strategy picks the Anthropic-native thinking shape for
   // Qwen on this endpoint ({ type: "enabled"|"disabled" }, budget_tokens).
-  const thinkingPayload = thinkingProviderFor(modelId).buildPayload(settings.thinking, {
+  const thinkingPayload = thinkingProviderFor(modelId, metadata).buildPayload(settings.thinking, {
     hasImageInput: messagesHaveImages(messages),
     endpoint: "messages",
   });

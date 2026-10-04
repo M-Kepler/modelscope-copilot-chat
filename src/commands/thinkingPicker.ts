@@ -16,6 +16,7 @@ export async function showThinkingEffortPicker(): Promise<void> {
     { label: "Qwen (qwen3.*)", key: "qwen", options: [...THINKING_ALLOWED_VALUES.qwen] },
     { label: "Qwen Thinking Budget", key: "qwenBudget", options: [...THINKING_ALLOWED_VALUES.qwenBudget] },
     { label: "Muse Spark (muse-spark-*)", key: "muse", options: [...THINKING_ALLOWED_VALUES.muse] },
+    { label: "Generic (any reasoning model without its own family)", key: "generic", options: [...THINKING_ALLOWED_VALUES.generic] },
   ];
   const settings = getSettings().thinking;
   const family = await vscode.window.showQuickPick(

@@ -22,12 +22,40 @@ const defaultSettings: ThinkingSettings = {
   qwenBudget: "auto",
   mimo: "off",
   muse: "off",
+  generic: "off",
 };
 
 /** Minimal reasoning-capable metadata used for schema tests. */
 const reasoningMetadata = {
   reasoning: true,
   reasoningOptions: [{ type: "effort" as const, values: ["high", "max"] }],
+  contextWindow: 202752,
+  maxOutputTokens: 32768,
+  supportsVision: false,
+  supportsAudio: false,
+  supportsVideo: false,
+  supportsPdf: false,
+  source: "models.dev" as const,
+};
+
+/**
+ * A model that reports reasoning support but declares no `reasoning_options` —
+ * the "new model this build has never heard of" case (e.g. `space-bunny-free`).
+ */
+const genericReasoningMetadata = {
+  reasoning: true,
+  contextWindow: 202752,
+  maxOutputTokens: 32768,
+  supportsVision: false,
+  supportsAudio: false,
+  supportsVideo: false,
+  supportsPdf: false,
+  source: "models.dev" as const,
+};
+
+/** A model that reports NO reasoning support. */
+const nonReasoningMetadata = {
+  reasoning: false,
   contextWindow: 202752,
   maxOutputTokens: 32768,
   supportsVision: false,
@@ -61,6 +89,7 @@ describe("KimiThinking — kimi-k2.7-code (issue #25)", () => {
   it("forces kimi='on' through resolve even when override requests 'off'", () => {
     const resolved = resolveThinkingConfig({
       modelId: "kimi-k2.7-code",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "off" },
     });
@@ -68,7 +97,7 @@ describe("KimiThinking — kimi-k2.7-code (issue #25)", () => {
   });
 
   it("forces kimi='on' even with no override at all (defensive against stale cache)", () => {
-    const resolved = resolveThinkingConfig({ modelId: "kimi-k2.7-code", workspace: defaultSettings });
+    const resolved = resolveThinkingConfig({ modelId: "kimi-k2.7-code", metadata: genericReasoningMetadata, workspace: defaultSettings });
     assert.equal(resolved.settings.kimi, "on");
   });
 });
@@ -92,6 +121,7 @@ describe("KimiThinking — other kimi models", () => {
   it("respects 'off' override", () => {
     const resolved = resolveThinkingConfig({
       modelId: "kimi-k2.6",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "off" },
     });
@@ -101,6 +131,7 @@ describe("KimiThinking — other kimi models", () => {
   it("respects 'on' override", () => {
     const resolved = resolveThinkingConfig({
       modelId: "kimi-k2.6",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "on" },
     });
@@ -193,6 +224,190 @@ describe("FallbackThinking — generic payload (issue #207)", () => {
   });
 });
 
+/**
+ * Generic reasoning support for models released after this build: the
+ * models.dev `reasoning` flag alone decides whether a model gets a picker and
+ * a `reasoning_effort`, with no per-family code involved.
+ */
+describe("FallbackThinking — unknown reasoning-capable models", () => {
+  it("gets the generic off→max schema when it declares no reasoning_options", () => {
+    const schema = thinkingProviderFor("space-bunny-free", genericReasoningMetadata).schema(genericReasoningMetadata);
+    assert.ok(schema, "expected a generic reasoning schema");
+    const reasoningEffort = schema.properties.reasoningEffort as Record<string, unknown>;
+    assert.deepEqual(reasoningEffort.enum, ["off", "low", "medium", "high", "xhigh", "max"]);
+    assert.deepEqual(reasoningEffort.enumItemLabels, ["Off", "Low", "Medium", "High", "XHigh", "Max"]);
+    assert.equal(reasoningEffort.default, "off");
+  });
+
+  it("the generic schema default tracks THINKING_DEFAULTS.generic", () => {
+    const schema = thinkingProviderFor("space-bunny-free", genericReasoningMetadata).schema(genericReasoningMetadata);
+    assert.ok(schema);
+    const reasoningEffort = schema.properties.reasoningEffort as Record<string, unknown>;
+    assert.equal(reasoningEffort.default, THINKING_DEFAULTS.generic);
+  });
+
+  it("emits a plain OpenAI-compatible reasoning_effort for every non-off level", () => {
+    const provider = thinkingProviderFor("space-bunny-free", genericReasoningMetadata);
+    for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+      const payload = provider.buildPayload({ ...defaultSettings, generic: level });
+      assert.deepEqual(payload, { reasoning_effort: level }, `expected ${level} to be emitted`);
+    }
+  });
+
+  it("'off' — the default — emits nothing and reports no thinking request", () => {
+    const provider = thinkingProviderFor("space-bunny-free", genericReasoningMetadata);
+    assert.deepEqual(provider.buildPayload(defaultSettings), {});
+    assert.equal(provider.requestsThinking(defaultSettings), false);
+    assert.equal(provider.requestsThinking({ ...defaultSettings, generic: "high" }), true);
+  });
+
+  it("carries a picker pick all the way to the request body", () => {
+    // The full production path: VS Code delivers the pick in modelConfiguration,
+    // resolveThinkingConfig maps it onto the family settings, and the request
+    // builder spreads buildPayload into the body.
+    const resolved = resolveThinkingConfig({
+      modelId: "space-bunny-free",
+      metadata: genericReasoningMetadata,
+      workspace: defaultSettings,
+      modelConfiguration: { reasoningEffort: "max" },
+    });
+    assert.equal(resolved.source, "modelConfiguration");
+    const payload = thinkingProviderFor("space-bunny-free", genericReasoningMetadata).buildPayload(resolved.settings);
+    assert.deepEqual(payload, { reasoning_effort: "max" });
+  });
+
+  it("strips the schema-default 'off' echo so the workspace setting still wins (issue #226)", () => {
+    // Depends on `metadata` reaching resolveThinkingConfig: without it the
+    // picker schema is unknown, no default is stripped, and VS Code's "off"
+    // baseline would clobber the user's workspace pick.
+    const resolved = resolveThinkingConfig({
+      modelId: "space-bunny-free",
+      metadata: genericReasoningMetadata,
+      workspace: { ...defaultSettings, generic: "high" },
+      modelConfiguration: { reasoningEffort: "off" },
+    });
+    assert.equal(resolved.settings.generic, "high");
+    assert.equal(resolved.source, "workspace");
+  });
+
+  it("prefers the model's own models.dev reasoning_options when it declares them", () => {
+    const schema = thinkingProviderFor("hy4", reasoningMetadata).schema(reasoningMetadata);
+    assert.ok(schema);
+    const reasoningEffort = schema.properties.reasoningEffort as Record<string, unknown>;
+    assert.deepEqual(reasoningEffort.enum, ["off", "high", "max"]);
+  });
+
+  it("applies an override for its own picker levels, not just the generic ladder", () => {
+    const resolved = resolveThinkingConfig({
+      modelId: "hy4",
+      metadata: reasoningMetadata,
+      workspace: defaultSettings,
+      modelConfiguration: { reasoningEffort: "max" },
+    });
+    assert.equal(resolved.settings.generic, "max");
+    assert.equal(resolved.source, "modelConfiguration");
+  });
+
+  it("keeps the repetition penalty alongside the effort for penalised models", () => {
+    const provider = thinkingProviderFor("big-pickle", genericReasoningMetadata);
+    assert.deepEqual(provider.buildPayload(defaultSettings), { repetition_penalty: 1.2 });
+    assert.deepEqual(provider.buildPayload({ ...defaultSettings, generic: "high" }), {
+      repetition_penalty: 1.2,
+      reasoning_effort: "high",
+    });
+  });
+});
+
+describe("FallbackThinking — unknown models without reasoning support", () => {
+  it("gets no schema at all, so no picker is shown", () => {
+    assert.equal(thinkingProviderFor("hy3", nonReasoningMetadata).schema(nonReasoningMetadata), undefined);
+  });
+
+  it("emits no reasoning payload even if a pick is somehow delivered", () => {
+    const provider = thinkingProviderFor("hy3", nonReasoningMetadata);
+    assert.deepEqual(provider.buildPayload({ ...defaultSettings, generic: "high" }), {});
+    assert.equal(provider.requestsThinking({ ...defaultSettings, generic: "high" }), false);
+  });
+
+  it("a model with no metadata at all stays inert (metadata unknown, not assumed capable)", () => {
+    const provider = thinkingProviderFor("hy3");
+    assert.equal(provider.schema(), undefined);
+    assert.deepEqual(provider.buildPayload({ ...defaultSettings, generic: "high" }), {});
+  });
+});
+
+describe("FallbackThinking — family-less models on non-chat endpoints stay inert", () => {
+  // `reasoning_effort` means nothing on these wire formats, so a picker there
+  // would be a control that silently does nothing (or 400s the request).
+  it("claude-*, gemini-* and grok-* get neither picker nor payload", () => {
+    for (const id of ["claude-sonnet-4.6", "gemini-3.5-pro", "grok-4.6"]) {
+      const provider = thinkingProviderFor(id, genericReasoningMetadata);
+      assert.equal(provider.schema(genericReasoningMetadata), undefined, `expected no picker for ${id}`);
+      assert.deepEqual(provider.buildPayload({ ...defaultSettings, generic: "high" }), {}, `expected no payload for ${id}`);
+    }
+  });
+});
+
+describe("known families keep their own strategy (generic setting must not leak)", () => {
+  it("each known family still builds its family-specific payload shape", () => {
+    const cases: Array<[string, ThinkingSettings, Record<string, unknown>]> = [
+      ["deepseek-v4-pro", { ...defaultSettings, deepseek: "high" }, { reasoning_effort: "high" }],
+      ["glm-5.2", { ...defaultSettings, glm: "max" }, { reasoning_effort: "max" }],
+      ["kimi-k2.6", { ...defaultSettings, kimi: "on" }, { thinking: { type: "enabled" } }],
+      ["minimax-m3", { ...defaultSettings, minimax: "on" }, { thinking: { type: "adaptive" } }],
+      ["mimo-v2.5", { ...defaultSettings, mimo: "medium" }, { reasoning_effort: "medium", budget_tokens: 16384, repetition_penalty: 1.2 }],
+      ["qwen3.6-plus", { ...defaultSettings, qwen: "on" }, { enable_thinking: true }],
+      ["gpt-5.6-luna", { ...defaultSettings, openai: "high" }, { reasoning: { effort: "high" } }],
+      ["muse-spark-1.2-contributor", { ...defaultSettings, muse: "high" }, { reasoning: { effort: "high" } }],
+    ];
+    for (const [modelId, settings, expected] of cases) {
+      assert.deepEqual(thinkingProviderFor(modelId).buildPayload(settings), expected, `payload changed for ${modelId}`);
+    }
+  });
+
+  it("the generic setting never reaches a known family's payload", () => {
+    for (const modelId of [
+      "deepseek-v4-pro",
+      "glm-5.2",
+      "kimi-k2.6",
+      "minimax-m3",
+      "mimo-v2.5",
+      "qwen3.6-plus",
+      "gpt-5.6-luna",
+      "muse-spark-1.2-contributor",
+    ]) {
+      // Same body with and without a generic pick — the family keeps its own shape.
+      const provider = thinkingProviderFor(modelId, genericReasoningMetadata);
+      assert.deepEqual(
+        provider.buildPayload({ ...defaultSettings, generic: "high" }),
+        provider.buildPayload(defaultSettings),
+        `${modelId} must ignore the generic effort`,
+      );
+    }
+  });
+
+  it("a known family's override still maps onto its own field", () => {
+    const resolved = resolveThinkingConfig({
+      modelId: "deepseek-v4-pro",
+      metadata: genericReasoningMetadata,
+      workspace: defaultSettings,
+      modelConfiguration: { reasoningEffort: "max" },
+    });
+    assert.equal(resolved.settings.deepseek, "max");
+    assert.equal(resolved.settings.generic, "off");
+  });
+
+  it("ignores a delivered pick for a model metadata says cannot reason", () => {
+    const resolved = resolveThinkingConfig({
+      modelId: "hy3",
+      metadata: nonReasoningMetadata,
+      workspace: defaultSettings,
+      modelConfiguration: { reasoningEffort: "high" },
+    });
+    assert.equal(resolved.settings.generic, "off");
+  });
+});
+
 describe("MimoThinking — payload + display (native reasoning model)", () => {
   it("mimo 'off' emits only repetition_penalty", () => {
     const payload = thinkingProviderFor("mimo-v2.5").buildPayload({ ...defaultSettings, mimo: "off" });
@@ -262,6 +477,7 @@ describe("GLMThinking — override (issue #61)", () => {
     for (const value of ["high", "max", "off"]) {
       const resolved = resolveThinkingConfig({
         modelId: "glm-5.2",
+        metadata: genericReasoningMetadata,
         workspace: defaultSettings,
         modelConfiguration: { reasoningEffort: value },
       });
@@ -273,6 +489,7 @@ describe("GLMThinking — override (issue #61)", () => {
     for (const value of ["on", "medium"]) {
       const resolved = resolveThinkingConfig({
         modelId: "glm-5.2",
+        metadata: genericReasoningMetadata,
         workspace: defaultSettings,
         modelConfiguration: { reasoningEffort: value },
       });
@@ -302,13 +519,14 @@ describe("GLMThinking — picker schema", () => {
 
 describe("GLMThinking — glm-5.3 always-thinking (issue #162)", () => {
   it("forces glm='high' through resolve even with no override (defensive default)", () => {
-    const resolved = resolveThinkingConfig({ modelId: "glm-5.3", workspace: defaultSettings });
+    const resolved = resolveThinkingConfig({ modelId: "glm-5.3", metadata: genericReasoningMetadata, workspace: defaultSettings });
     assert.equal(resolved.settings.glm, "high");
   });
 
   it("forces glm='high' even when override requests 'off' (stale cache)", () => {
     const resolved = resolveThinkingConfig({
       modelId: "glm-5.3",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "off" },
     });
@@ -318,6 +536,7 @@ describe("GLMThinking — glm-5.3 always-thinking (issue #162)", () => {
   it("respects a valid 'max' override for glm-5.3", () => {
     const resolved = resolveThinkingConfig({
       modelId: "glm-5.3",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "max" },
     });
@@ -345,7 +564,7 @@ describe("GLMThinking — glm-5.3 always-thinking (issue #162)", () => {
 
   it("detects glm-5.3 variants (dot/hyphen, free/suffix) as always-thinking", () => {
     for (const id of ["glm-5.3", "glm-5.3-free", "glm-5-3", "glm-5.10", "glm-5.3-code"]) {
-      const resolved = resolveThinkingConfig({ modelId: id, workspace: defaultSettings });
+      const resolved = resolveThinkingConfig({ modelId: id, metadata: genericReasoningMetadata, workspace: defaultSettings });
       assert.equal(resolved.settings.glm, "high", `expected ${id} to force thinking on`);
     }
   });
@@ -429,6 +648,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   it("modelConfiguration wins over the workspace default", () => {
     const resolved = resolveThinkingConfig({
       modelId: "deepseek-v4-pro",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "max" },
     });
@@ -438,7 +658,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   });
 
   it("falls back to workspace when no override exists", () => {
-    const resolved = resolveThinkingConfig({ modelId: "deepseek-v4-pro", workspace: defaultSettings });
+    const resolved = resolveThinkingConfig({ modelId: "deepseek-v4-pro", metadata: genericReasoningMetadata, workspace: defaultSettings });
     assert.equal(resolved.settings.deepseek, "off");
     assert.equal(resolved.source, "workspace");
     assert.equal(resolved.overrideApplied, false);
@@ -447,6 +667,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   it("a delivered schema-default echo is ignored so the workspace default wins (issue #226)", () => {
     const resolved = resolveThinkingConfig({
       modelId: "deepseek-v4-pro",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "off" },
     });
@@ -458,6 +679,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   it("a schema-default echo does not mask a non-default workspace setting (issue #226)", () => {
     const resolved = resolveThinkingConfig({
       modelId: "deepseek-v4-pro",
+      metadata: genericReasoningMetadata,
       workspace: { ...defaultSettings, deepseek: "high" },
       modelConfiguration: { reasoningEffort: "off" },
     });
@@ -469,6 +691,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   it("echo stripping is per-key: a real choice beside an echo still applies", () => {
     const resolved = resolveThinkingConfig({
       modelId: "qwen3.6-plus",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "off", thinkingBudget: "16384" },
     });
@@ -479,6 +702,7 @@ describe("resolveThinkingConfig — provenance & priority", () => {
   it("models whose schema default is not 'off' strip their own default too (kimi-k2.7-code)", () => {
     const resolved = resolveThinkingConfig({
       modelId: "kimi-k2.7-code",
+      metadata: genericReasoningMetadata,
       workspace: defaultSettings,
       modelConfiguration: { reasoningEffort: "on" },
     });

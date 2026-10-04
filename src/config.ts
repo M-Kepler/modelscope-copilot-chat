@@ -61,6 +61,7 @@ export const SETTING_THINKING_QWEN = "thinking.qwen";
 export const SETTING_THINKING_QWEN_BUDGET = "thinking.qwenBudget";
 export const SETTING_THINKING_MIMO = "thinking.mimo";
 export const SETTING_THINKING_MUSE = "thinking.muse";
+export const SETTING_THINKING_GENERIC = "thinking.generic";
 
 // ─── Inline completions (issue #49) ─────────────────────────────────────────
 
@@ -398,4 +399,5 @@ export const THINKING_DEFAULTS = {
   qwenBudget: "auto",
   mimo: "off",
   muse: "off",
+  generic: "off",
 } as const;

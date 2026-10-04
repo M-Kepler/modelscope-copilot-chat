@@ -456,6 +456,19 @@
           ],
           "default": "off",
           "markdownDescription": "Thinking mode for Muse Spark models (`muse-spark-1.2-contributor`, `muse-spark-1.2-contributor-free`). Maps to the Responses API `reasoning.effort` field. Higher effort increases reasoning depth and may increase latency and usage."
+        },
+        "opencodego.thinking.generic": {
+          "type": "string",
+          "enum": [
+            "off",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "default": "off",
+          "markdownDescription": "Thinking mode for models with no dedicated family — including any model released after this extension build. Applies only when models.dev reports the model as reasoning-capable; maps to `reasoning_effort` on the OpenAI-compatible endpoint. `off` sends nothing; `xhigh`/`max` ask for the deepest reasoning the model offers. Models with their own family (DeepSeek, GLM, Kimi, MiniMax, MiMo, Qwen, Muse, GPT) ignore this setting."
         }
       }
     },

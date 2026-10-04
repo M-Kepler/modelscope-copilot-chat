@@ -93,14 +93,30 @@ export function schemaFromReasoningOptions(metadata?: ResolvedModelMetadata): Th
   };
 }
 
-/** Generic off/on schema for any reasoning-capable model (Priority 3 fallback). */
+/**
+ * The effort ladder offered to a reasoning-capable model that declares no
+ * `reasoning_options` in models.dev. Kept small and OpenAI-compatible so it is
+ * safe for any future model on the chat-completions endpoint; a model that
+ * declares its own levels gets those instead (see
+ * {@link schemaFromReasoningOptions}, which takes priority).
+ */
+export const GENERIC_REASONING_EFFORTS = ["off", "low", "medium", "high", "xhigh", "max"] as const;
+
+/** Generic effort schema for any reasoning-capable model (Priority 3 fallback). */
 export function genericReasoningSchema(): ThinkingSchema {
   return {
     properties: {
       reasoningEffort: effortProperty({
-        enum: ["off", "on"],
-        labels: ["Off", "On"],
-        descriptions: ["Fastest responses", "Enable reasoning"],
+        enum: GENERIC_REASONING_EFFORTS,
+        labels: ["Off", "Low", "Medium", "High", "XHigh", "Max"],
+        descriptions: [
+          "Fastest responses",
+          "Faster responses with less reasoning",
+          "Balanced reasoning and speed",
+          "Greater reasoning depth but slower",
+          "Maximum reasoning depth",
+          "Maximum reasoning effort",
+        ],
         default: "off",
       }),
     },
