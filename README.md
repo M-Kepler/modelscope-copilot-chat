@@ -240,15 +240,15 @@ GitHub Copilot has four tiers now: **Free**, **Pro ($10/mo)**, **Pro+ ($39/mo)**
 
 Per-model reasoning configuration, dynamically enhanced with `reasoning_options` from `models.dev`:
 
-| Family                         | Options                                                | Setting                                    |
-| ------------------------------ | ------------------------------------------------------ | ------------------------------------------ |
-| **DeepSeek**                   | `off` / `low` / `medium` / `high` / `max`              | `opencodego.thinking.deepseek`             |
-| **GLM**                        | `off` / `high` / `max`                                 | `opencodego.thinking.glm`                  |
-| **Kimi**                       | `on` / `off`                                           | `opencodego.thinking.kimi`                 |
-| **MiniMax**                    | `off` / `on`                                           | `opencodego.thinking.minimax`              |
-| **Mimo (Xiaomi)**              | `off` / `low` / `medium` / `high`                      | `opencodego.thinking.mimo`                 |
-| **Qwen**                       | `auto` / `on` / `off` + `thinking_budget` (4096–81920) | `opencodego.thinking.qwen` + `.qwenBudget` |
-| **Any future reasoning model** | `off` / `on` (auto-detected from `models.dev`)         | auto                                       |
+| Family                         | Options                                                                               | Setting                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **DeepSeek**                   | `off` / `low` / `medium` / `high` / `max`                                             | `opencodego.thinking.deepseek`             |
+| **GLM**                        | `off` / `high` / `max`                                                                | `opencodego.thinking.glm`                  |
+| **Kimi**                       | `on` / `off`                                                                          | `opencodego.thinking.kimi`                 |
+| **MiniMax**                    | `off` / `on`                                                                          | `opencodego.thinking.minimax`              |
+| **Mimo (Xiaomi)**              | `off` / `low` / `medium` / `high`                                                     | `opencodego.thinking.mimo`                 |
+| **Qwen**                       | `auto` / `on` / `off` + `thinking_budget` (4096–81920)                                | `opencodego.thinking.qwen` + `.qwenBudget` |
+| **Any future reasoning model** | `off` / `low` / `medium` / `high` / `xhigh` / `max` (auto-detected from `models.dev`) | `opencodego.thinking.generic`              |
 
 > **`opencodego.debugReasoning`** writes provider `reasoning_content` to **Output → OpenCode** for debugging.
 
