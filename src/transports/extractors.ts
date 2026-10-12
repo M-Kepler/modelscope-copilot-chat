@@ -71,20 +71,40 @@ abstract class BaseResponseExtractor {
     return reasoning;
   }
 
+  /** Flush any buffered carry in the think filter to the returned parts array. */
+  protected flushThinkFilterToParts(parts: vscode.LanguageModelResponsePart[]): void {
+    if (!this.thinkFilter) {
+      return;
+    }
+    const { visible, thinking } = this.thinkFilter.finish();
+    if (visible) {
+      this.emittedTextLength += visible.length;
+      parts.push(new vscode.LanguageModelTextPart(visible));
+    }
+    if (thinking) {
+      this.handleReasoning(thinking);
+    }
+  }
+
+  /** Flush any buffered carry in the think filter to the progress sink. */
+  protected flushThinkFilterToProgress(progress: vscode.Progress<vscode.LanguageModelResponsePart2>, localRequestId?: string): void {
+    if (!this.thinkFilter) {
+      return;
+    }
+    const { visible, thinking } = this.thinkFilter.finish();
+    if (visible) {
+      this.emittedTextLength += visible.length;
+      reportProgressPart(localRequestId, progress, new vscode.LanguageModelTextPart(visible));
+    }
+    if (thinking) {
+      this.handleReasoning(thinking);
+    }
+  }
+
   /** Emit the shared end-of-stream reasoning fallback. */
   flushReasoningFallback(progress: vscode.Progress<vscode.LanguageModelResponsePart2>, localRequestId?: string): void {
     // Flush any remaining text in the think filter
-    if (this.thinkFilter) {
-      const { visible, thinking } = this.thinkFilter.finish();
-      if (visible) {
-        this.emittedTextLength += visible.length;
-        reportProgressPart(localRequestId, progress, new vscode.LanguageModelTextPart(visible));
-      }
-      if (thinking) {
-        // Surface remaining think-filter carry through the thinking part channel.
-        this.handleReasoning(thinking);
-      }
-    }
+    this.flushThinkFilterToProgress(progress, localRequestId);
 
     const reasoning = this.reasoningContent.trim();
     if (!reasoning) {
@@ -339,6 +359,7 @@ class OpenAiResponseExtractor extends BaseResponseExtractor {
     // gpt-5.6-luna, issue #93) are flushed once at end-of-stream via
     // `flushRemainingToolCalls()`.
     if (ToolCallAccumulator.shouldFlushOnFinishReason(first.finish_reason)) {
+      this.flushThinkFilterToParts(parts);
       const toolParts = this.flushToolCalls();
       this.emittedToolCallsCount += toolParts.length;
       parts.push(...toolParts);
@@ -411,6 +432,7 @@ class OpenAiResponseExtractor extends BaseResponseExtractor {
       this.toolCallAccumulator.flush();
       return;
     }
+    this.flushThinkFilterToProgress(progress, localRequestId);
     const toolParts = this.flushToolCalls();
     this.emittedToolCallsCount += toolParts.length;
     for (const part of toolParts) {
@@ -504,18 +526,14 @@ class AnthropicResponseExtractor extends BaseResponseExtractor {
     //    updates the real RequestUsageSummary); here we only flush tool calls.
     if (eventType === "message_delta" && delta) {
       if (delta.stop_reason) {
-        const toolParts = this.flushToolCalls();
-        this.emittedToolCallsCount += toolParts.length;
-        parts.push(...toolParts);
+        this.flushPendingToolCalls(parts);
       }
       return parts;
     }
 
     // 4. message_stop: final event, flush any remaining tool calls.
     if (eventType === "message_stop") {
-      const toolParts = this.flushToolCalls();
-      this.emittedToolCallsCount += toolParts.length;
-      parts.push(...toolParts);
+      this.flushPendingToolCalls(parts);
       return parts;
     }
 
@@ -569,13 +587,18 @@ class AnthropicResponseExtractor extends BaseResponseExtractor {
       }
 
       if (delta.stop_reason) {
-        const toolParts = this.flushToolCalls();
-        this.emittedToolCallsCount += toolParts.length;
-        parts.push(...toolParts);
+        this.flushPendingToolCalls(parts);
       }
     }
 
     return parts;
+  }
+
+  private flushPendingToolCalls(parts: vscode.LanguageModelResponsePart[]): void {
+    this.flushThinkFilterToParts(parts);
+    const toolParts = this.flushToolCalls();
+    this.emittedToolCallsCount += toolParts.length;
+    parts.push(...toolParts);
   }
 
   private flushToolCalls(): vscode.LanguageModelToolCallPart[] {

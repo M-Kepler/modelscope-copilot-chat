@@ -38,12 +38,17 @@ moduleResolver._resolveFilename = function (request: string, parent: unknown, ..
 };
 
 let OpenAiResponseExtractor: typeof import("../transports/extractors.js").OpenAiResponseExtractor;
+let AnthropicResponseExtractor: typeof import("../transports/extractors.js").AnthropicResponseExtractor;
+let ThinkTagFilter: typeof import("../transports/thinkTags.js").ThinkTagFilter;
 let truncateToolName: typeof import("../request/openai.js").truncateToolName;
 
 describe("OpenAiResponseExtractor — truncated tool name round-trip", () => {
   before(async () => {
     const extractors = await import("../transports/extractors.js");
     OpenAiResponseExtractor = extractors.OpenAiResponseExtractor;
+    AnthropicResponseExtractor = extractors.AnthropicResponseExtractor;
+    const thinkTags = await import("../transports/thinkTags.js");
+    ThinkTagFilter = thinkTags.ThinkTagFilter;
     const openai = await import("../request/openai.js");
     truncateToolName = openai.truncateToolName;
   });
@@ -297,5 +302,142 @@ describe("updateRequestUsageSummary — Responses nested usage", () => {
     assert.equal(summary.promptTokens, 100);
     assert.equal(summary.completionTokens, 20);
     assert.equal(summary.totalTokens, 120);
+  });
+});
+
+describe("OpenAiResponseExtractor — thinkTag carry flushing before tool calls", () => {
+  it("emits pending thinkFilter carry as TextPart before tool calls on finish_reason: 'tool_calls'", () => {
+    const filter = new ThinkTagFilter();
+    const extractor = new OpenAiResponseExtractor(undefined, undefined, filter);
+
+    // Delta with text ending in a partial tag '<thi'
+    const parts1 = extractor.extractStreamParts({
+      choices: [
+        {
+          index: 0,
+          delta: {
+            content: "Calling tool <thi",
+            tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "test_tool", arguments: '{"a":1}' } }],
+          },
+          finish_reason: null,
+        },
+      ],
+    }) as { value?: string }[];
+
+    // First chunk emits the safe portion
+    assert.equal(parts1.length, 1);
+    assert.equal(parts1[0].value, "Calling tool ");
+
+    // Second chunk triggers finish_reason: "tool_calls"
+    const parts2 = extractor.extractStreamParts({
+      choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+    }) as { value?: string; callId?: string; name?: string }[];
+
+    // Second chunk must emit '<thi' as TextPart BEFORE the ToolCallPart!
+    assert.equal(parts2.length, 2);
+    assert.equal(parts2[0].value, "<thi");
+    assert.equal(parts2[1].callId, "call_1");
+    assert.equal(parts2[1].name, "test_tool");
+    assert.equal(extractor.emittedText, "Calling tool <thi".length);
+  });
+
+  it("flushRemainingToolCalls flushes pending thinkFilter carry before reporting tool calls", () => {
+    const filter = new ThinkTagFilter();
+    const extractor = new OpenAiResponseExtractor(undefined, undefined, filter);
+
+    extractor.extractStreamParts({
+      choices: [
+        {
+          index: 0,
+          delta: {
+            content: "Run command <",
+            tool_calls: [{ index: 0, id: "call_2", type: "function", function: { name: "run_cmd", arguments: '{"cmd":"ls"}' } }],
+          },
+          finish_reason: null,
+        },
+      ],
+    });
+
+    const emitted: { value?: string; callId?: string; name?: string }[] = [];
+    const progress: import("vscode").Progress<import("vscode").LanguageModelResponsePart2> = {
+      report: (part) => {
+        emitted.push(part as unknown as { value?: string; callId?: string; name?: string });
+      },
+    };
+
+    extractor.flushRemainingToolCalls(progress, undefined);
+
+    assert.equal(emitted.length, 2);
+    assert.equal(emitted[0].value, "<");
+    assert.equal(emitted[1].callId, "call_2");
+    assert.equal(emitted[1].name, "run_cmd");
+  });
+});
+
+describe("AnthropicResponseExtractor — thinkTag carry flushing before tool calls", () => {
+  it("flushes pending thinkFilter carry before emitting tool calls on message_delta", () => {
+    const filter = new ThinkTagFilter();
+    const extractor = new AnthropicResponseExtractor(undefined, undefined, filter);
+
+    // Initial content block start with tool_use
+    extractor.extractStreamParts({
+      type: "content_block_start",
+      index: 0,
+      content_block: { type: "tool_use", id: "anthropic_call_1", name: "search" },
+    });
+    // Text block delta that leaves carry
+    extractor.extractStreamParts({
+      type: "content_block_delta",
+      index: 1,
+      delta: { type: "text_delta", text: "Searching <thi" },
+    });
+    // Tool argument delta
+    extractor.extractStreamParts({
+      type: "content_block_delta",
+      index: 0,
+      delta: { type: "input_json_delta", partial_json: '{"q":"test"}' },
+    });
+
+    // message_delta with stop_reason
+    const parts = extractor.extractStreamParts({
+      type: "message_delta",
+      delta: { stop_reason: "tool_use" },
+    }) as { value?: string; callId?: string; name?: string }[];
+
+    assert.equal(parts.length, 2);
+    assert.equal(parts[0].value, "<thi");
+    assert.equal(parts[1].callId, "anthropic_call_1");
+    assert.equal(parts[1].name, "search");
+  });
+
+  it("flushes pending thinkFilter carry on message_stop", () => {
+    const filter = new ThinkTagFilter();
+    const extractor = new AnthropicResponseExtractor(undefined, undefined, filter);
+
+    extractor.extractStreamParts({
+      type: "content_block_start",
+      index: 0,
+      content_block: { type: "tool_use", id: "anthropic_call_2", name: "calculate" },
+    });
+    extractor.extractStreamParts({
+      type: "content_block_delta",
+      index: 1,
+      delta: { type: "text_delta", text: "Result: 5 <" },
+    });
+    extractor.extractStreamParts({
+      type: "content_block_delta",
+      index: 0,
+      delta: { type: "input_json_delta", partial_json: '{"x":5}' },
+    });
+
+    // message_stop without prior message_delta stop_reason
+    const parts = extractor.extractStreamParts({
+      type: "message_stop",
+    }) as { value?: string; callId?: string; name?: string }[];
+
+    assert.equal(parts.length, 2);
+    assert.equal(parts[0].value, "<");
+    assert.equal(parts[1].callId, "anthropic_call_2");
+    assert.equal(parts[1].name, "calculate");
   });
 });
