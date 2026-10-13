@@ -368,6 +368,7 @@ Ghost-text completions while typing, powered by the OpenCode gateway with **thin
 
 - **Native endpoint routing** per family (see [Models](#-models) table)
 - **Tool-calling** forwarded in correct format per endpoint (OpenAI `tool_calls` vs Anthropic `tool_use`)
+- **Prompt-cache stability:** deterministic Responses tool-call ids, a conversation-stable session header, and structural Anthropic `cache_control` breakpoints keep gateway prefix-cache hits high (~98%+) across tool turns and history trims — long sessions stay cheap (#251)
 - **Sticky gateway headers** (`x-opencode-session`, `x-opencode-request`, `x-opencode-client`) for affinity
 - **Request & stream timeouts:** defaults 600s total / 120s idle; configurable
 - **Transient 5xx retry:** momentary gateway `502`/`503`/`504` and `Router.Unavailable` errors are retried up to 2× with exponential backoff + jitter

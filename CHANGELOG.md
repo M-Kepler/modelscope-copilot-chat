@@ -2,9 +2,11 @@
 
 All notable changes to the **OpenCode Go BYOK Provider** extension are documented here.
 
-## [0.7.9] — unreleased
+## [0.7.9] — 2026-10-13
 
 ### Fixed
+
+- **`[Cache]` Provider prompt-cache misses caused by client-side prefix instability are fixed — deterministic Responses ids, stable session anchor, and structural Anthropic breakpoints (#251, thanks @lecommander).** Three independent sources of replay instability each broke the gateway prefix cache in their own way: (1) Responses tool-call item ids were regenerated with `randomUUID` per request, so the same history never replayed byte-identically and the cache broke at the first `function_call` item on every tool turn — ids are now derived deterministically as `fc` + `sha256(call id)` (existing `fc_*` ids pass through verbatim); (2) the `x-opencode-session` fallback hashed the first 3 messages, which shift on every history trim by design — it now hashes the first message plus sorted tool names plus model id, memoized per conversation for its lifetime; (3) `buildAnthropicMessages` placed `cache_control` on the first 4 content blocks in emit order, so any added part shifted all later marks and fought the 4-slot budget gateways also inject — marks now sit at structural boundaries only (end of message 0 and end of message N-2), at most 2, on the last block of a marked message. DeepSeek-class implicit routes get the stability with zero new markers. Verified with 24/24 targeted tests, 497/497 full suite, and a 30-turn live run holding `cacheHit` at 98%+ after turn 2 with exactly one dip across a trim event.
 
 - **`[Providers]` The `apiBaseUrl` settings actually apply again — every request path now honors a custom compatible gateway (#247).** `opencodego.apiBaseUrl` / `opencodezen.apiBaseUrl` were accepted but ignored: PR #149 had fully implemented them, but later structural refactors reverted the provider definitions to hardcoded `opencode.ai` URLs and dropped the settings wiring, leaving only orphaned helpers (and a `resolveUsageUrl` tracker hook no one supplied). The base URL is now read once at startup from the root configuration with the full setting key, normalized (non-http(s), embedded credentials, query/hash fall back to the default), and derived into every route — chat transports, Agents window variants, model discovery, connection test, inline completions, and the Go `/usage` sync — via a single pure helper (`apiRoutesFromBaseUrl`). Reload after changing, as documented. Documented in `docs/issues/110-20261013-issue247-api-base-url-ignored.md`.
 
