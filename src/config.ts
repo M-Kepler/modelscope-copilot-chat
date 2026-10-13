@@ -151,6 +151,33 @@ export function appendApiPath(baseUrl: string, route: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/${route.replace(/^\/+/, "")}`;
 }
 
+/** The API routes every provider gateway serves, derived from one base URL. */
+export interface ApiRoutes {
+  modelsUrl: string;
+  chatCompletionsUrl: string;
+  messagesUrl: string;
+  responsesUrl: string;
+  usageUrl: string;
+}
+
+/**
+ * Derive the full route set from a (default or user-configured) base URL.
+ *
+ * CONTRACT (issue #247): every provider request path — chat transports, model
+ * discovery, connection test, inline completions, Go usage sync — must get its
+ * endpoint from this derivation so a custom `apiBaseUrl` setting applies
+ * everywhere. Pure function (no `vscode` import) so it stays unit-testable.
+ */
+export function apiRoutesFromBaseUrl(baseUrl: string): ApiRoutes {
+  return {
+    modelsUrl: appendApiPath(baseUrl, "models"),
+    chatCompletionsUrl: appendApiPath(baseUrl, "chat/completions"),
+    messagesUrl: appendApiPath(baseUrl, "messages"),
+    responsesUrl: appendApiPath(baseUrl, "responses"),
+    usageUrl: appendApiPath(baseUrl, "usage"),
+  };
+}
+
 // ─── Output budget / token-estimate margins ──────────────────────────────────
 
 /** Reserve for UI rendering so the advertised output never claims the full window. */
