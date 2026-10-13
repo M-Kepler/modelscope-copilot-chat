@@ -1,5 +1,16 @@
 import * as vscode from "vscode";
-import { CONFIG_SECTION, FALLBACK_USER_AGENT, FREE_ZEN_MODEL_IDS, SETTING_FREE_ONLY } from "../config";
+import {
+  appendApiPath,
+  apiRoutesFromBaseUrl,
+  CONFIG_SECTION,
+  DEFAULT_GO_API_BASE_URL,
+  DEFAULT_ZEN_API_BASE_URL,
+  FALLBACK_USER_AGENT,
+  FREE_ZEN_MODEL_IDS,
+  normalizeApiBaseUrl,
+  SETTING_API_BASE_URL,
+  SETTING_FREE_ONLY,
+} from "../config";
 import type { ModelEndpointKind } from "../core/registry";
 import type { ApiMessage } from "../request/types";
 import { AGENT_GO_VENDOR, AGENT_ZEN_VENDOR, GO_VENDOR, ZEN_VENDOR, type AllProviderVendor } from "../providerTypes";
@@ -14,6 +25,8 @@ export interface ProviderDefinition {
   chatCompletionsUrl: string;
   messagesUrl: string;
   responsesUrl?: string;
+  /** Go-only server usage meter route; derived from the same base URL. */
+  usageUrl?: string;
   testModelId: string;
   fallbackModels: string[];
   filterModel?: (modelId: string) => boolean;
@@ -24,6 +37,35 @@ export interface ProviderDefinition {
 }
 
 let cachedUserAgent: string | undefined;
+
+/**
+ * Read a provider base URL from settings, falling back safely when missing or
+ * malformed (issue #247).
+ *
+ * CONTRACT:
+ * - Reads from the ROOT configuration with the FULL setting key
+ *   (`opencodego.apiBaseUrl`). A section-scoped read
+ *   (`getConfiguration("opencodego").get("apiBaseUrl")`) would resolve the key
+ *   relative to the section and misread it — same trap as `enabled`.
+ * - Non-http(s), embedded credentials, query strings, and hashes fall back to
+ *   the built-in default via {@link normalizeApiBaseUrl}.
+ * - Changes take effect on window reload (documented behavior), matching the
+ *   module-scope derivation in {@link PROVIDERS}.
+ */
+export function configuredApiBaseUrl(vendor: typeof GO_VENDOR | typeof ZEN_VENDOR): string {
+  const fallback = vendor === GO_VENDOR ? DEFAULT_GO_API_BASE_URL : DEFAULT_ZEN_API_BASE_URL;
+  // Structural view keeps module-scope PROVIDERS derivation importable in
+  // bare unit-test environments where the vscode stub exposes no workspace.
+  const workspace = vscode.workspace as
+    { getConfiguration?: () => { get?: (section: string, defaultValue: string) => string | undefined } } | undefined;
+  const configured = workspace?.getConfiguration?.().get?.(`${vendor}.${SETTING_API_BASE_URL}`, fallback);
+  return normalizeApiBaseUrl(configured ?? fallback, fallback);
+}
+
+/** Resolve the Go usage route from the same base URL as the Go provider. */
+export function configuredGoUsageUrl(): string {
+  return appendApiPath(configuredApiBaseUrl(GO_VENDOR), "usage");
+}
 
 /**
  * Build the User-Agent string from the extension's declared version.
@@ -66,6 +108,7 @@ function providerVariant(
     chatCompletionsUrl: base.chatCompletionsUrl,
     messagesUrl: base.messagesUrl,
     responsesUrl: base.responsesUrl,
+    usageUrl: base.usageUrl,
     testModelId: base.testModelId,
     fallbackModels: base.fallbackModels,
     filterModel: base.filterModel,
@@ -73,14 +116,19 @@ function providerVariant(
 }
 
 export const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition> = (() => {
+  // Routes derive from the configured apiBaseUrl setting so a custom compatible
+  // gateway replaces the built-in opencode.ai endpoints end-to-end (issue #247).
+  const goRoutes = apiRoutesFromBaseUrl(configuredApiBaseUrl(GO_VENDOR));
+  const zenRoutes = apiRoutesFromBaseUrl(configuredApiBaseUrl(ZEN_VENDOR));
   const go: ProviderDefinition = {
     vendor: GO_VENDOR,
     displayName: "OpenCode Go",
     modelNamePrefix: "OpenCode Go",
-    modelsUrl: "https://opencode.ai/zen/go/v1/models",
-    chatCompletionsUrl: "https://opencode.ai/zen/go/v1/chat/completions",
-    messagesUrl: "https://opencode.ai/zen/go/v1/messages",
-    responsesUrl: "https://opencode.ai/zen/go/v1/responses",
+    modelsUrl: goRoutes.modelsUrl,
+    chatCompletionsUrl: goRoutes.chatCompletionsUrl,
+    messagesUrl: goRoutes.messagesUrl,
+    responsesUrl: goRoutes.responsesUrl,
+    usageUrl: goRoutes.usageUrl,
     testModelId: "deepseek-v4-flash",
     fallbackModels: [
       // Curated active set from models.dev (2026-09-08) — deprecated/legacy
@@ -118,10 +166,10 @@ export const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition>
     vendor: ZEN_VENDOR,
     displayName: "OpenCode Zen",
     modelNamePrefix: "OpenCode Zen",
-    modelsUrl: "https://opencode.ai/zen/v1/models",
-    chatCompletionsUrl: "https://opencode.ai/zen/v1/chat/completions",
-    messagesUrl: "https://opencode.ai/zen/v1/messages",
-    responsesUrl: "https://opencode.ai/zen/v1/responses",
+    modelsUrl: zenRoutes.modelsUrl,
+    chatCompletionsUrl: zenRoutes.chatCompletionsUrl,
+    messagesUrl: zenRoutes.messagesUrl,
+    responsesUrl: zenRoutes.responsesUrl,
     testModelId: "deepseek-v4-flash-free",
     fallbackModels: [
       "claude-opus-4-7",

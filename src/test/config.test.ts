@@ -41,6 +41,7 @@ import {
   MODEL_METADATA_REVISION,
   MODELS_DEV_API_URL,
   normalizeApiBaseUrl,
+  apiRoutesFromBaseUrl,
   PROFILES_REGISTRY_KEY,
   REASONING_CACHE_LIMIT,
   RECENT_TRANSPORT_SUMMARY_LIMIT,
@@ -223,5 +224,22 @@ describe("config — provider API URLs", () => {
     assert.equal(normalizeApiBaseUrl("http://localhost:8080/v1", DEFAULT_GO_API_BASE_URL), "http://localhost:8080/v1");
     assert.equal(normalizeApiBaseUrl("javascript:alert(1)", DEFAULT_GO_API_BASE_URL), DEFAULT_GO_API_BASE_URL);
     assert.equal(normalizeApiBaseUrl("https://user:pass@gateway.example.test/v1", DEFAULT_GO_API_BASE_URL), DEFAULT_GO_API_BASE_URL);
+  });
+
+  it("derives the full route set from a configured base URL (issue #247)", () => {
+    assert.deepEqual(apiRoutesFromBaseUrl("https://gateway.example.test/custom/v1/"), {
+      modelsUrl: "https://gateway.example.test/custom/v1/models",
+      chatCompletionsUrl: "https://gateway.example.test/custom/v1/chat/completions",
+      messagesUrl: "https://gateway.example.test/custom/v1/messages",
+      responsesUrl: "https://gateway.example.test/custom/v1/responses",
+      usageUrl: "https://gateway.example.test/custom/v1/usage",
+    });
+    assert.deepEqual(apiRoutesFromBaseUrl(DEFAULT_GO_API_BASE_URL), {
+      modelsUrl: "https://opencode.ai/zen/go/v1/models",
+      chatCompletionsUrl: "https://opencode.ai/zen/go/v1/chat/completions",
+      messagesUrl: "https://opencode.ai/zen/go/v1/messages",
+      responsesUrl: "https://opencode.ai/zen/go/v1/responses",
+      usageUrl: "https://opencode.ai/zen/go/v1/usage",
+    });
   });
 });

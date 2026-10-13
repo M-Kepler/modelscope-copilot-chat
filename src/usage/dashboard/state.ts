@@ -18,6 +18,7 @@ import {
 } from "../../config";
 import { GoUsageTracker, type GoUsageTrackerOptions } from "../tracker";
 import { LEGACY_FINGERPRINT, type UsageProfile } from "../usageProfile";
+import { configuredGoUsageUrl } from "../../provider/definitions";
 
 /**
  * Mutable module state for the usage dashboard plus its accessors. All other
@@ -123,6 +124,9 @@ export function usageTrackerOptions(): GoUsageTrackerOptions {
       config().get<UsageTodayYesterdaySource>(SETTING_USAGE_TODAY_YESTERDAY_SOURCE, DEFAULT_USAGE_TODAY_YESTERDAY_SOURCE),
     resolveCodebaseWindowDays: () => config().get<number>(SETTING_USAGE_CODEBASE_WINDOW_DAYS, DEFAULT_USAGE_CODEBASE_WINDOW_DAYS),
     resolveDayBoundary: () => config().get<"utc" | "local">(SETTING_USAGE_DAY_BOUNDARY, DEFAULT_USAGE_DAY_BOUNDARY),
+    // Follow the Go provider's configured apiBaseUrl so a custom gateway also
+    // serves the server usage meters (issue #247).
+    resolveUsageUrl: () => configuredGoUsageUrl(),
   };
 }
 
