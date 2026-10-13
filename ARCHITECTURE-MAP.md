@@ -412,31 +412,32 @@ Reuse these before writing new logic (all under `src/` root unless noted):
 
 ## 8. Tests, Tooling & CI
 
-### Unit tests (`src/test/` — 37 files, 480 cases)
+### Unit tests (`src/test/` — 40 files, 532 cases)
 
-Pure/domain modules get co-located tests. **Harness:** Node's built-in `node --test` runner via `scripts/run-unit-tests.ts`, which collects the compiled `out/test/*.test.js` files; tests import from compiled `out/` modules with explicit `.js` extensions (Node16/ESM-style) and use `node:test` + `node:assert/strict`. Tests never need a live model — they cover the deterministic parts (message conversion, chunk parsing, token estimation, routing). Per-file case counts (480 total, audited 2026-09-23):
+Pure/domain modules get co-located tests. **Harness:** Node's built-in `node --test` runner via `scripts/run-unit-tests.ts`, which collects the compiled `out/test/*.test.js` files; tests import from compiled `out/` modules with explicit `.js` extensions (Node16/ESM-style) and use `node:test` + `node:assert/strict`. Tests never need a live model — they cover the deterministic parts (message conversion, chunk parsing, token estimation, routing). Per-file case counts (532 total, audited 2026-10-13):
 
-| Test file                         | Cases |     | Test file                       | Cases |
-| --------------------------------- | ----- | --- | ------------------------------- | ----- |
-| `thinking.test.ts`                | 71    |     | `goUsageTrackerWindows.test.ts` | 17    |
-| `retry.test.ts`                   | 37    |     | `responsesRequest.test.ts`      | 16    |
-| `goUsageTracker.test.ts`          | 35    |     | `registry.test.ts`              | 16    |
-| `metadata.test.ts`                | 28    |     | `routing.test.ts`               | 15    |
-| `utils.test.ts`                   | 22    |     | `messages.test.ts`              | 19    |
-| `autocomplete.test.ts`            | 21    |     | `extractors.test.ts`            | 15    |
-| `toolCallAccumulator.test.ts`     | 19    |     | `config.test.ts`                | 15    |
-| `visionProxy.test.ts`             | 17    |     | `openai-request.test.ts`        | 12    |
-| `goUsageSync.test.ts`             | 10    |     | `usageProfile.test.ts`          | 9     |
-| `sse.test.ts`                     | 9     |     | `reasoningHistory.test.ts`      | 9     |
-| `autocompleteUsage.test.ts`       | 9     |     | `deprecatedFilter.test.ts`      | 8     |
-| `schema.test.ts`                  | 7     |     | `modelLimits.test.ts`           | 5     |
-| `imageNormalizer.test.ts`         | 5     |     | `session-header.test.ts`        | 4     |
-| `issue216-217-regression.test.ts` | 4     |     | `providerEnablement.test.ts`    | 3     |
-| `deferredToolImages.test.ts`      | 3     |     | `modelCapabilities.test.ts`     | 3     |
-| `modelNames.test.ts`              | 3     |     | `apiKeyResolution.test.ts`      | 3     |
-| `chatParts.test.ts`               | 3     |     | `engine.test.ts`                | 3     |
-| `tokenEstimate.test.ts`           | 2     |     | `headers.test.ts`               | 2     |
-|                                   |       |     | `agentProvider.test.ts`         | 1     |
+| Test file                              | Cases |     | Test file                       | Cases |
+| -------------------------------------- | ----- | --- | ------------------------------- | ----- |
+| `thinking.test.ts`                     | 88    |     | `goUsageTrackerWindows.test.ts` | 17    |
+| `retry.test.ts`                        | 37    |     | `responsesRequest.test.ts`      | 18    |
+| `goUsageTracker.test.ts`               | 35    |     | `registry.test.ts`              | 16    |
+| `metadata.test.ts`                     | 28    |     | `routing.test.ts`               | 18    |
+| `utils.test.ts`                        | 22    |     | `messages.test.ts`              | 19    |
+| `autocomplete.test.ts`                 | 21    |     | `extractors.test.ts`            | 19    |
+| `toolCallAccumulator.test.ts`          | 21    |     | `config.test.ts`                | 16    |
+| `visionProxy.test.ts`                  | 17    |     | `thinkTags.test.ts`             | 13    |
+| `goUsageSync.test.ts`                  | 10    |     | `openai-request.test.ts`        | 12    |
+| `sse.test.ts`                          | 9     |     | `reasoningHistory.test.ts`      | 9     |
+| `autocompleteUsage.test.ts`            | 9     |     | `deprecatedFilter.test.ts`      | 8     |
+| `schema.test.ts`                       | 7     |     | `modelLimits.test.ts`           | 5     |
+| `issue244-followup-regression.test.ts` | 6     |     | `errors.test.ts`                | 4     |
+| `imageNormalizer.test.ts`              | 5     |     | `session-header.test.ts`        | 4     |
+| `issue216-217-regression.test.ts`      | 4     |     | `providerEnablement.test.ts`    | 3     |
+| `deferredToolImages.test.ts`           | 3     |     | `modelCapabilities.test.ts`     | 3     |
+| `modelNames.test.ts`                   | 3     |     | `apiKeyResolution.test.ts`      | 3     |
+| `chatParts.test.ts`                    | 3     |     | `engine.test.ts`                | 3     |
+| `tokenEstimate.test.ts`                | 2     |     | `usageProfile.test.ts`          | 9     |
+| `headers.test.ts`                      | 2     |     | `agentProvider.test.ts`         | 1     |
 
 ### Scripts (`scripts/`)
 

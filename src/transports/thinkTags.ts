@@ -65,22 +65,21 @@ export class ThinkTagFilter {
     let visible = "";
     let thinking = "";
     let pos = 0;
-    const maxScan = Math.max(OPEN_THINK_TAG.length, CLOSE_THINK_TAG.length);
 
     while (pos < buffer.length) {
       if (this.insideThink) {
         // Look for closing </think>
         const closeIdx = buffer.indexOf(CLOSE_THINK_TAG, pos);
         if (closeIdx === -1) {
-          // No closing tag found — consume the rest, but keep a tail for
-          // boundary matching in the next chunk.
-          const safeEnd = buffer.length - maxScan;
-          if (safeEnd > pos) {
-            thinking += buffer.slice(pos, safeEnd);
-            this.carry = buffer.slice(safeEnd);
+          // No closing tag found — consume the rest, but keep a tail if it could
+          // be the start of a closing tag split across chunk boundaries.
+          const lastLt = buffer.lastIndexOf("<");
+          if (lastLt >= pos && CLOSE_THINK_TAG.startsWith(buffer.slice(lastLt))) {
+            thinking += buffer.slice(pos, lastLt);
+            this.carry = buffer.slice(lastLt);
           } else {
-            // Entire remaining buffer is shorter than max scan — carry it all
-            this.carry = buffer.slice(pos);
+            thinking += buffer.slice(pos);
+            this.carry = "";
           }
           break;
         }
@@ -99,13 +98,15 @@ export class ThinkTagFilter {
         // Look for opening <think>
         const openIdx = buffer.indexOf(OPEN_THINK_TAG, pos);
         if (openIdx === -1) {
-          // No opening tag — emit visible text but keep a tail for boundary
-          const safeEnd = buffer.length - maxScan;
-          if (safeEnd > pos) {
-            visible += buffer.slice(pos, safeEnd);
-            this.carry = buffer.slice(safeEnd);
+          // No opening tag — emit visible text but keep a tail if it could
+          // be the start of an opening tag split across chunk boundaries.
+          const lastLt = buffer.lastIndexOf("<");
+          if (lastLt >= pos && OPEN_THINK_TAG.startsWith(buffer.slice(lastLt))) {
+            visible += buffer.slice(pos, lastLt);
+            this.carry = buffer.slice(lastLt);
           } else {
-            this.carry = buffer.slice(pos);
+            visible += buffer.slice(pos);
+            this.carry = "";
           }
           break;
         }
