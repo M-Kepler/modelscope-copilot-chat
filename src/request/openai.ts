@@ -27,7 +27,7 @@ export function buildChatCompletionsRequestBody(
   limits: ModelLimits,
 ): Record<string, unknown> {
   const tools = mapOpenAiTools(options.tools);
-  const thinkingPayload = thinkingProviderFor(modelId).buildPayload(settings.thinking, {
+  const thinkingPayload = thinkingProviderFor(modelId, metadata).buildPayload(settings.thinking, {
     hasImageInput: messagesHaveImages(messages),
     endpoint: "chat",
   });
@@ -62,7 +62,7 @@ export function buildResponsesRequestBody(
   // the whole request otherwise.
   const input = pairResponsesFunctionCallItems(messages.flatMap((message) => responsesInputItemsFromMessage(message)));
   const tools = mapResponsesTools(options.tools, modelId);
-  const thinkingPayload = thinkingProviderFor(modelId).buildPayload(settings.thinking, {
+  const thinkingPayload = thinkingProviderFor(modelId, metadata).buildPayload(settings.thinking, {
     hasImageInput: messagesHaveImages(messages),
     endpoint: "responses",
   });

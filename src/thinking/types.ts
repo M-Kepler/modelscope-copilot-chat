@@ -15,6 +15,15 @@ export interface ThinkingSettings {
   qwenBudget: "auto" | "4096" | "16384" | "32768" | "81920";
   mimo: "off" | "low" | "medium" | "high";
   muse: "off" | "low" | "medium" | "high" | "xhigh";
+  /**
+   * Effort for models with no dedicated thinking family, sent as a plain
+   * OpenAI-compatible `reasoning_effort`. `"off"` sends nothing.
+   *
+   * Deliberately open-ended rather than a fixed union: the picker's levels come
+   * from the model's own models.dev `reasoning_options` when it declares any,
+   * so a model can offer levels this build has never heard of.
+   */
+  generic: string;
 }
 
 /** Detected thinking family for a raw model id. `null` = no known family. */

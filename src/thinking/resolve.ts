@@ -18,7 +18,14 @@ import { thinkingProviderFor } from "./provider";
 
 export interface ResolveThinkingConfigInput {
   modelId: string;
-  metadata?: ResolvedModelMetadata;
+  /**
+   * REQUIRED. The generic (no-known-family) strategy decides whether a model
+   * takes a reasoning effort purely from `metadata.reasoning`, and the picker's
+   * schema default comes from the same metadata — so resolving without it
+   * silently discards the user's per-model pick and re-introduces the stale
+   * schema-default echo that {@link stripSchemaDefaultEcho} exists to remove.
+   */
+  metadata: ResolvedModelMetadata;
   /** Workspace settings (`opencodego.thinking.*`), already defaulted. */
   workspace: ThinkingSettings;
   /** Live per-model config from `options.modelConfiguration` (may be absent). */

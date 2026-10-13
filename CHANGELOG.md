@@ -2,6 +2,12 @@
 
 All notable changes to the **OpenCode Go BYOK Provider** extension are documented here.
 
+## [0.7.9] — 2026-10-04
+
+### Fixed
+
+- **`[Thinking]` The per-model Reasoning Effort picker now actually works for models with no known thinking family (#252).** For any model not matched by a hardcoded family in `core/registry.ts` (`space-bunny-free`, `big-pickle`, `hy3`, …) the picker rendered a Thinking Effort control whose selection was silently discarded — the request never carried a reasoning field, so the model always answered at its default effort. Two independent defects: `FallbackThinking` had no payload path at all (`buildPayload` returned `{}`), _and_ all four `buildPayload` call sites called `thinkingProviderFor(modelId)` without metadata, so any metadata-driven gate could never fire. models.dev is now the source of truth: `metadata.reasoning` decides whether a model gets a control, its own `reasoning_options` decide which levels (falling back to a shared `off`/`low`/`medium`/`high`/`xhigh`/`max` ladder), and the pick is sent as a plain OpenAI-compatible `reasoning_effort`. A new `opencodego.thinking.generic` setting provides a workspace-wide default. Family-less models routed to non-chat endpoints (`claude-*` → Anthropic messages, `gemini-*` → Google, `grok-*` → Responses) are deliberately excluded — `reasoning_effort` is meaningless on those wire formats — and the `big-pickle` repetition penalty (issue #207) is preserved and composes with the effort field. Fixing this exposed a second bug in the same feature: `prepareChatRequest` resolved thinking config _before_ metadata was available and without passing it, so the generic strategy dropped the per-model pick outright while the workspace setting kept working — a confusing split where the Copilot dropdown did nothing but settings worked. Metadata is now a required field on `ResolveThinkingConfigInput` so the compiler rejects that call shape. Documented in `docs/issues/109-20261004-issue252-generic-reasoning-effort.md`.
+
 ## [0.7.8] — 2026-09-25
 
 ### Fixed

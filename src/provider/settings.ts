@@ -11,6 +11,7 @@ import {
   SETTING_STRIP_THINK_TAGS,
   SETTING_TEMPERATURE,
   SETTING_THINKING_DEEPSEEK,
+  SETTING_THINKING_GENERIC,
   SETTING_THINKING_GLM,
   SETTING_THINKING_KIMI,
   SETTING_THINKING_MIMO,
@@ -43,6 +44,7 @@ export const THINKING_ALLOWED_VALUES = {
   qwenBudget: ["auto", "4096", "16384", "32768", "81920"],
   mimo: ["off", "low", "medium", "high"],
   muse: ["off", "low", "medium", "high", "xhigh"],
+  generic: ["off", "low", "medium", "high", "xhigh", "max"],
 } as const;
 
 /** Return `value` when it is one of `allowed`, else `fallback`. */
@@ -194,6 +196,11 @@ export function getSettings(): ApiSettings {
         readConfigValue(config, SETTING_THINKING_MUSE, THINKING_DEFAULTS.muse),
         THINKING_ALLOWED_VALUES.muse,
         THINKING_DEFAULTS.muse,
+      ),
+      generic: validThinkingValue(
+        readConfigValue(config, SETTING_THINKING_GENERIC, THINKING_DEFAULTS.generic),
+        THINKING_ALLOWED_VALUES.generic,
+        THINKING_DEFAULTS.generic,
       ),
     },
     stripThinkTags: config.get<ApiSettings["stripThinkTags"]>(SETTING_STRIP_THINK_TAGS, "auto"),

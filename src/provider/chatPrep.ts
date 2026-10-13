@@ -123,14 +123,24 @@ export async function prepareChatRequest(
 
   const baseSettings = getSettings();
   const requestOverride = getRequestModelConfiguration(options);
+  // Extract the context-size tier selected by the user (if any)
+  const contextSizeOverride = typeof requestOverride?.contextSize === "number" ? requestOverride.contextSize : undefined;
+  const metadataSnapshot = await deps.getMetadataSnapshot();
+  const metadata = deps.resolveModelMetadata(rawModelId, metadataSnapshot);
   // Resolve the effective thinking config: VS Code's per-model configuration
   // (options.modelConfiguration, chatLanguageModels.json) is the SINGLE
   // authority for per-model thinking; the workspace setting is the default;
   // THINKING_DEFAULTS is the final fallback. No extension-side persisted
   // shadow state (removed — it fought the VS Code authority and could pin a
   // stale non-off value over the user's Off).
+  //
+  // `metadata` is REQUIRED here, not optional: the generic (no-known-family)
+  // strategy decides whether a model takes a reasoning effort purely from
+  // `metadata.reasoning`, so resolving without it silently discards the user's
+  // per-model pick and falls back to the workspace setting.
   const resolvedThinking = resolveThinkingConfig({
     modelId: rawModelId,
+    metadata,
     workspace: baseSettings.thinking,
     modelConfiguration: requestOverride,
   });
@@ -138,10 +148,6 @@ export async function prepareChatRequest(
     ...baseSettings,
     thinking: resolvedThinking.settings,
   };
-  // Extract the context-size tier selected by the user (if any)
-  const contextSizeOverride = typeof requestOverride?.contextSize === "number" ? requestOverride.contextSize : undefined;
-  const metadataSnapshot = await deps.getMetadataSnapshot();
-  const metadata = deps.resolveModelMetadata(rawModelId, metadataSnapshot);
   const routing = resolveModelRouting(rawModelId, deps.definition);
 
   // `hasImageInput` is computed from the flattened (pre-normalize) messages:
@@ -272,7 +278,7 @@ export async function prepareChatRequest(
   const promptTokens = historyTrim.finalTokens;
   const limits = modelLimits(metadata, settings, contextSizeOverride, promptTokens);
 
-  const thinkingPayload = thinkingProviderFor(rawModelId).buildPayload(settings.thinking, {
+  const thinkingPayload = thinkingProviderFor(rawModelId, metadata).buildPayload(settings.thinking, {
     hasImageInput: hasImageInput && metadata.supportsVision,
     endpoint: routing.endpointKind === "messages" ? "messages" : routing.endpointKind === "responses" ? "responses" : "chat",
   });
