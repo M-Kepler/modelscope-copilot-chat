@@ -353,7 +353,7 @@ required after toggling.
 Ghost-text completions while typing, powered by the OpenCode gateway with **thinking forced off**:
 
 - Opt-in: `"opencodego.inlineSuggestions": true` (requires a window reload).
-- Model: `opencodego.inlineSuggestionsModel` defaults to `qwen3.5-plus`, whose `enable_thinking=false` mode is a no-reasoning path (measured ~1.5s TTFB, zero hidden reasoning). Reasoning models (e.g. `deepseek-v4-flash`) burn 100+ reasoning tokens even with thinking off and are not recommended.
+- Model: `opencodego.inlineSuggestionsModel` defaults to `qwen3.6-plus` with `enable_thinking=false` (no-reasoning path). Reasoning models burn 100+ reasoning tokens even with thinking off and are not recommended. (The previous default, `qwen3.5-plus`, was removed from the Go gateway — installs on older releases must switch models manually.)
 - Tuning knobs (all optional): `inlineSuggestionsDebounceMs` (300), `inlineSuggestionsTimeoutMs` (3000), `inlineSuggestionsMaxTokens` (128), `inlineSuggestionsPrefixLines` (10), `inlineSuggestionsSuffixChars` (300).
 - Requests are tiny (10 lines before the cursor + a short suffix by default), debounced 300ms, time out at 3s, and are aborted on the next keystroke.
 - The gateway exposes no FIM endpoint, so completions use fill-in-the-middle emulation with FIM tokens over `/chat/completions`.

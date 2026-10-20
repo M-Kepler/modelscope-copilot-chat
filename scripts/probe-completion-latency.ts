@@ -6,9 +6,11 @@
 // gateway tolerates a `suffix` field (FIM emulation).
 //
 // Usage:
-//   OPENCODE_KEY=sk-... tsx scripts/probe-completion-latency.ts [--stream]
+//   OPENCODE_KEY=sk-... npx tsx scripts/probe-completion-latency.ts [--stream]
 //
 // The key is read from the environment only and never printed or logged.
+// Requests carry a fixed x-opencode-session probe id (required by the Go
+// gateway since 2026-09-07; extension parity per commit 418c4c4).
 
 import { spawnSync } from "node:child_process";
 
@@ -32,19 +34,9 @@ const SUFFIX = ";\n}";
 
 const probes: ProbeConfig[] = [
   {
-    label: "deepseek-v4-flash (thinking off, no reasoning_effort)",
-    body: {
-      model: "deepseek-v4-flash",
-      stream: true,
-      max_tokens: MAX_TOKENS,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: `<|fim_prefix|>${PREFIX}<|fim_suffix|>${SUFFIX}<|fim_middle|>` },
-      ],
-    },
-  },
-  {
-    label: "qwen3.5-plus (enable_thinking=false)",
+    // Removed from the Go catalog (2026-10-20 check) — expect an HTTP error,
+    // which confirms the FIM root cause (issue: inline suggestions silent).
+    label: "qwen3.5-plus (enable_thinking=false) — expect removed",
     body: {
       model: "qwen3.5-plus",
       stream: true,
@@ -57,9 +49,23 @@ const probes: ProbeConfig[] = [
     },
   },
   {
-    label: "qwen3.5-plus + suffix field (gateway tolerance)",
+    // Current default candidate (successor of qwen3.5-plus on Go).
+    label: "qwen3.6-plus (enable_thinking=false)",
     body: {
-      model: "qwen3.5-plus",
+      model: "qwen3.6-plus",
+      stream: true,
+      max_tokens: MAX_TOKENS,
+      enable_thinking: false,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: `<|fim_prefix|>${PREFIX}<|fim_suffix|>${SUFFIX}<|fim_middle|>` },
+      ],
+    },
+  },
+  {
+    label: "qwen3.6-plus + suffix field (gateway tolerance)",
+    body: {
+      model: "qwen3.6-plus",
       stream: true,
       max_tokens: MAX_TOKENS,
       enable_thinking: false,
@@ -89,7 +95,11 @@ function probe(config: ProbeConfig): void {
         const started = Number(process.env.PROBE_STARTED);
         fetch("${URL}", {
           method: "POST",
-          headers: { Authorization: "Bearer " + KEY, "Content-Type": "application/json" },
+          headers: {
+            Authorization: "Bearer " + KEY,
+            "Content-Type": "application/json",
+            "x-opencode-session": "vscode-completion-latency-probe",
+          },
           body: JSON.stringify(body),
         }).then(async (r) => {
           process.stdout.write("HTTP " + r.status + "\\n");
