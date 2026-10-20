@@ -4,6 +4,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// node:sqlite only exists on Node >= 22.5 (CI also runs a Node 20 matrix) —
+// the DB-backed tests skip there instead of failing; the probe-parsing test
+// still runs everywhere.
+const nodeSqliteSkip: string | undefined = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sqlite = require("node:sqlite") as { DatabaseSync?: unknown };
+    return typeof sqlite.DatabaseSync === "function" ? undefined : "node:sqlite unavailable";
+  } catch {
+    return "node:sqlite unavailable on this Node version";
+  }
+})();
+
 // Issue #262 regression tests: the CLI history reader must read BOTH schemas
 // (CLI 1.x `message` + CLI 2.x `session_message`) WITHOUT double-counting the
 // rows the CLI 2.x migration copied into both tables. The tests build real
@@ -17,11 +30,15 @@ interface SqliteDb {
 }
 
 function openDb(path: string): SqliteDb | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { DatabaseSync } = require("node:sqlite") as {
-    DatabaseSync?: new (p: string) => SqliteDb;
-  };
-  return typeof DatabaseSync === "function" ? new DatabaseSync(path) : undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { DatabaseSync } = require("node:sqlite") as {
+      DatabaseSync?: new (p: string) => SqliteDb;
+    };
+    return typeof DatabaseSync === "function" ? new DatabaseSync(path) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const MESSAGE_SCHEMA = `
@@ -82,7 +99,7 @@ describe("CLI history reader — dual schema (issue #262)", () => {
     assert.deepEqual(parseHistorySchemasProbeRow({ legacyPresent: 0, v2Present: 2 }), { legacy: false, cli2: true });
   });
 
-  it("legacy-only database reads the message table and excludes non-Go providers", async () => {
+  it("legacy-only database reads the message table and excludes non-Go providers", { skip: nodeSqliteSkip }, async () => {
     const { dbPath, dir } = withTempDb((db) => {
       db.prepare(MESSAGE_SCHEMA).run();
       insertLegacy(db, "m1", 0.5, 100, "/repo", "mimo-v2.5");
@@ -94,7 +111,7 @@ describe("CLI history reader — dual schema (issue #262)", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("CLI 2.x database deduplicates rows present in both schemas (no double count)", async () => {
+  it("CLI 2.x database deduplicates rows present in both schemas (no double count)", { skip: nodeSqliteSkip }, async () => {
     const { dbPath, dir } = withTempDb((db) => {
       db.prepare(MESSAGE_SCHEMA).run();
       db.prepare(SESSION_V2_SCHEMA).run();
@@ -127,7 +144,7 @@ describe("CLI history reader — dual schema (issue #262)", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("fresh CLI 2.x database without the legacy message table still reads history", async () => {
+  it("fresh CLI 2.x database without the legacy message table still reads history", { skip: nodeSqliteSkip }, async () => {
     const { dbPath, dir } = withTempDb((db) => {
       db.prepare(SESSION_V2_SCHEMA).run();
       db.prepare(SESSION_MESSAGE_SCHEMA).run();
