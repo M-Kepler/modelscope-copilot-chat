@@ -1,7 +1,7 @@
 {
   "name": "opencode-copilot-chat",
   "displayName": "OpenCode for Copilot Chat: BYOK 30+ AI Models",
-  "description": "Use 30+ frontier AI models (DeepSeek V4, Kimi K2.6, GLM-5.1, Qwen3.7, MiMo V2.5, MiniMax M2.7, free Claude Opus, GPT-5.5, Gemini 3.5, Grok) in GitHub Copilot Chat. Bring Your Own Key, no Copilot Pro needed.",
+  "description": "Use 30+ frontier AI models (DeepSeek V4, Kimi K2.6, GLM-5.1, Qwen3.7, MiMo V2.5, MiniMax M2.7, Claude Opus, GPT-5.5, Gemini 3.5, Grok) in GitHub Copilot Chat. Bring Your Own Key, no Copilot Pro needed.",
   "version": "0.7.9",
   "publisher": "ltmoerdani",
   "license": "MIT",
@@ -34,8 +34,7 @@
     "chat",
     "agent",
     "reasoning",
-    "thinking",
-    "free-models"
+    "thinking"
   ],
   "repository": {
     "type": "git",
@@ -431,7 +430,7 @@
             "off"
           ],
           "default": "off",
-          "markdownDescription": "Thinking mode for Qwen models (`qwen3.5-plus`, `qwen3.6-plus`, `qwen3.6-plus-free`). Maps to `enable_thinking`. `auto` lets the model decide (omits the flag), `on`/`off` force-enable or disable hybrid thinking. Off is the recommended default to avoid empty Copilot replies."
+          "markdownDescription": "Thinking mode for Qwen models (`qwen3.5-plus`, `qwen3.6-plus`, `qwen3.7-plus`). Maps to `enable_thinking`. `auto` lets the model decide (omits the flag), `on`/`off` force-enable or disable hybrid thinking. Off is the recommended default to avoid empty Copilot replies."
         },
         "opencodego.thinking.qwenBudget": {
           "type": "string",
@@ -455,7 +454,7 @@
             "xhigh"
           ],
           "default": "off",
-          "markdownDescription": "Thinking mode for Muse Spark models (`muse-spark-1.2-contributor`, `muse-spark-1.2-contributor-free`). Maps to the Responses API `reasoning.effort` field. Higher effort increases reasoning depth and may increase latency and usage."
+          "markdownDescription": "Thinking mode for Muse Spark models (`muse-spark-1.2-contributor`, `muse-spark-1.3-contributor`). Maps to the Responses API `reasoning.effort` field. Higher effort increases reasoning depth and may increase latency and usage."
         },
         "opencodego.thinking.gemini": {
           "type": "string",
