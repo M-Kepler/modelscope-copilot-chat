@@ -32,6 +32,16 @@ export function thinkingTextFromValue(value: string | string[]): string {
  *   - MiMo: strict Pydantic-style validator rejects `reasoning_content` (issue #38).
  *   - GPT: OpenAI Responses API — messages carry no `reasoning_content` field.
  *   - Claude: Anthropic Messages API — no `reasoning_content` field.
+ *   - MiniMax: interleaved thinking model — reasoning must be replayed as
+ *     `<think>...</think>` inline in assistant `content` (see
+ *     {@link inlineThinkingForHistory}), NOT as a separate field. Sending the
+ *     `reasoning_content` field is silently dropped by the upstream, which
+ *     severs thinking continuity across tool loops and makes the model
+ *     re-derive (and repeat) the same reasoning preamble on every tool call.
+ *     Source: MiniMax-AI/MiniMax-M2 README, "Inference Parameters" — "it is
+ *     important to retain the thinking content from the assistant's turns
+ *     within the historical messages... Do not remove the `<think>...</think>`
+ *     part, otherwise, the model's performance will be negatively affected."
  * - Unknown families are left untouched (no echo).
  */
 export function shouldEchoThinkingHistory(rawModelId: string | undefined): boolean {
@@ -39,5 +49,21 @@ export function shouldEchoThinkingHistory(rawModelId: string | undefined): boole
   if (/^mimo-/i.test(rawModelId)) return false;
   if (/^gpt-/i.test(rawModelId)) return false;
   if (/^claude-/i.test(rawModelId)) return false;
+  if (isMiniMaxModel(rawModelId)) return false;
   return thinkingFamily(rawModelId) !== null || /^gemini-/i.test(rawModelId);
+}
+
+/** Whether the model replays assistant thinking as inline `<think>` tags (MiniMax). */
+export function isMiniMaxModel(rawModelId: string | undefined): boolean {
+  return rawModelId !== undefined && /^minimax-/i.test(rawModelId);
+}
+
+/**
+ * Wrap thinking text in `<think>` tags for history replay on interleaved
+ * thinking models (MiniMax). Returns the `"<think>...\n"` prefix to prepend to
+ * the assistant `content`, or an empty string when there is nothing to replay.
+ */
+export function inlineThinkingForHistory(thinkingText: string | undefined): string {
+  const trimmed = thinkingText?.trim();
+  return trimmed ? `<think>${trimmed}</think>\n` : "";
 }

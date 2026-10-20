@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { shouldEchoThinkingHistory, thinkingTextFromValue } from "../reasoningHistory";
+import { shouldEchoThinkingHistory, inlineThinkingForHistory, thinkingTextFromValue } from "../reasoningHistory";
 
 test("thinkingTextFromValue — passes plain strings through", () => {
   assert.equal(thinkingTextFromValue("hello"), "hello");
@@ -30,7 +30,23 @@ test("shouldEchoThinkingHistory — OpenAI-compatible reasoning families require
   assert.equal(shouldEchoThinkingHistory("kimi-k2.6"), true);
   assert.equal(shouldEchoThinkingHistory("glm-5.2"), true);
   assert.equal(shouldEchoThinkingHistory("qwen3.6-plus"), true);
-  assert.equal(shouldEchoThinkingHistory("minimax-m2.7"), true);
+});
+
+test("shouldEchoThinkingHistory — MiniMax replays thinking inline, not as a field", () => {
+  // MiniMax is an interleaved thinking model: reasoning must be replayed as
+  // <think> tags inside content (see inlineThinkingForHistory), never as
+  // reasoning_content — the upstream drops the field (MiniMax-M2 README).
+  assert.equal(shouldEchoThinkingHistory("minimax-m2.7"), false);
+  assert.equal(shouldEchoThinkingHistory("minimax-m3.1"), false);
+});
+
+test("inlineThinkingForHistory — wraps trimmed thinking in <think> tags", () => {
+  assert.equal(inlineThinkingForHistory(" plan "), "<think>plan</think>\n");
+});
+
+test("inlineThinkingForHistory — empty or missing thinking produces no prefix", () => {
+  assert.equal(inlineThinkingForHistory(undefined), "");
+  assert.equal(inlineThinkingForHistory("   "), "");
 });
 
 test("shouldEchoThinkingHistory — Gemini needs the echo for thought parts", () => {

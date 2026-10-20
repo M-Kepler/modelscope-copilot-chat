@@ -3,7 +3,7 @@ import { isInternalDataPart, isReasoningMarkerPart, readReasoningMarker } from "
 import { requiresStringToolContent } from "../models/modelCapabilities";
 import { MAX_HISTORY_IMAGES_KEPT, MAX_TOOL_RESULT_IMAGE_BYTES } from "../config";
 import { getImageDataUrlBase64Bytes, MAX_IMAGE_BASE64_BYTES, normalizeImageDataUrl } from "../imageNormalizer";
-import { shouldEchoThinkingHistory, thinkingTextFromValue } from "../reasoningHistory";
+import { inlineThinkingForHistory, isMiniMaxModel, shouldEchoThinkingHistory, thinkingTextFromValue } from "../reasoningHistory";
 import { withDeferredToolImageMessages } from "../request/shared";
 import type { ApiMessage, OpenAiContentPart, OpenAiToolCall } from "../request/types";
 import { partToText } from "./tokens";
@@ -239,16 +239,29 @@ export async function convertMessage(
     // For MiMo we omit reasoning_content in the echoed assistant tool_call
     // history. The current live response still surfaces reasoning_content to
     // the user via the thinking panel — only the *history echo* is dropped.
-    // Other families (DeepSeek, Kimi, GLM, Qwen, MiniMax) tolerate the echo
-    // and keep it for cross-turn reasoning continuity.
+    // Other families (DeepSeek, Kimi, GLM, Qwen) tolerate the echo and keep
+    // it for cross-turn reasoning continuity.
+    //
+    // MiniMax is an interleaved thinking model: the upstream IGNORES the
+    // `reasoning_content` field on replay and requires the thinking to stay
+    // inline as `<think>...</think>` at the front of assistant `content`
+    // (MiniMax-AI/MiniMax-M2 README, "Inference Parameters"). Dropping or
+    // mis-formatting it severs thinking continuity across the tool loop and
+    // makes the model re-derive — and visibly repeat — the same reasoning
+    // preamble before every tool call.
     const shouldOmitReasoningEcho = rawModelId !== undefined && /^mimo-/i.test(rawModelId);
+    const toolCallReasoning = reasoningForToolCalls(toolCalls, reasoningContentByToolCallId) ?? thinkingText;
+    const inlinePrefix = isMiniMaxModel(rawModelId) ? inlineThinkingForHistory(toolCallReasoning) : "";
     return finish([
       {
         role,
-        content: typeof content === "string" ? content || null : content,
-        reasoning_content: shouldOmitReasoningEcho
-          ? undefined
-          : (reasoningForToolCalls(toolCalls, reasoningContentByToolCallId) ?? thinkingText),
+        content:
+          inlinePrefix && typeof content === "string"
+            ? inlinePrefix + (content || "")
+            : typeof content === "string"
+              ? content || null
+              : content,
+        reasoning_content: shouldOmitReasoningEcho || isMiniMaxModel(rawModelId) ? undefined : toolCallReasoning,
         tool_calls: toolCalls,
       },
     ]);
@@ -259,10 +272,13 @@ export async function convertMessage(
   }
 
   if (role === "assistant") {
+    // MiniMax replays thinking inline as `<think>` tags inside `content`
+    // (see the tool_call branch above); everyone else uses `reasoning_content`.
+    const plainPrefix = isMiniMaxModel(rawModelId) ? inlineThinkingForHistory(thinkingText) : "";
     return finish([
       {
         role,
-        content: typeof content === "string" ? content || null : content,
+        content: plainPrefix ? plainPrefix + (textContent || "") : typeof content === "string" ? content || null : content,
         reasoning_content: shouldEchoThinkingHistory(rawModelId) ? thinkingText : undefined,
       },
     ]);
