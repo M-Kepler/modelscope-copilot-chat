@@ -12,6 +12,30 @@ import type { UsageLogEntry } from "./tracker";
 
 const OPENCODE_DB_PATH = path.join(os.homedir(), ".local", "share", "opencode", "opencode.db");
 
+/**
+ * Per-message usage rows for the OpenCode Go provider.
+ *
+ * Two on-disk schemas carry the same data and both must be read:
+ *
+ * - CLI 1.x (`message`): flat JSON — `$.providerID`, `$.role`, `$.modelID`,
+ *   `$.path.cwd`.
+ * - CLI 2.x (`session_message`): role moved to the `type` COLUMN, provider and
+ *   model moved under `$.model` (`$.model.providerID`, `$.model.id`), and
+ *   `$.path.cwd` no longer exists — the working directory lives on the parent
+ *   session (`session_v2.directory`) and is reached via `session_id`.
+ *
+ * The two tables overlap: a CLI 2.x database keeps the migrated legacy rows in
+ * `message` as well, so the same message id can exist in both. Reading them
+ * with `UNION` (not `UNION ALL`) over an identical projection deduplicates on
+ * the full row; reading `session_v2` instead would be WRONG because that
+ * table holds one aggregated row per SESSION, so it would double-count every
+ * message that belongs to a session that also has a legacy row.
+ *
+ * `session_message` and `session_v2` may not exist on a CLI 1.x install, so
+ * the query probes for them and falls back to the legacy table alone. The
+ * probe is a separate statement because a missing table is a hard error at
+ * prepare time — it cannot be guarded inside the SELECT.
+ */
 const HISTORY_ROWS_SQL = `
   SELECT
     CAST(COALESCE(json_extract(data, '$.time.created'), time_created) AS INTEGER) AS createdMs,
@@ -28,6 +52,75 @@ const HISTORY_ROWS_SQL = `
     AND json_extract(data, '$.role') = 'assistant'
     AND json_type(data, '$.cost') IN ('integer', 'real')
 `;
+
+/**
+ * CLI 2.x per-message rows. Mirrors {@link HISTORY_ROWS_SQL} field for field so
+ * the two can be combined with `UNION` (which deduplicates on the full row).
+ * The `id` is projected so overlapping rows from the two schemas collapse.
+ */
+const HISTORY_ROWS_SQL_V2 = `
+  SELECT
+    CAST(COALESCE(json_extract(sm.data, '$.time.created'), sm.time_created) AS INTEGER) AS createdMs,
+    CAST(json_extract(sm.data, '$.cost') AS REAL) AS cost,
+    CAST(json_extract(sm.data, '$.tokens.input') AS INTEGER) AS tokensInput,
+    CAST(json_extract(sm.data, '$.tokens.output') AS INTEGER) AS tokensOutput,
+    CAST(json_extract(sm.data, '$.tokens.reasoning') AS INTEGER) AS tokensReasoning,
+    CAST(json_extract(sm.data, '$.tokens.cache.read') AS INTEGER) AS tokensCacheRead,
+    s.directory AS cwd,
+    json_extract(sm.data, '$.model.id') AS modelId
+  FROM session_message sm
+  JOIN session_v2 s ON s.id = sm.session_id
+  WHERE json_valid(sm.data)
+    AND sm.type = 'assistant'
+    AND json_extract(sm.data, '$.model.providerID') = 'opencode-go'
+    AND json_type(sm.data, '$.cost') IN ('integer', 'real')
+`;
+
+/**
+ * The combined query: legacy rows plus CLI 2.x rows, deduplicated.
+ *
+ * `UNION` (not `UNION ALL`) removes the rows the two schemas share. A message
+ * that exists in both tables has the same usage numbers in both, so the
+ * duplicate collapses to a single row — no double counting.
+ */
+const HISTORY_ROWS_SQL_COMBINED = `
+  ${HISTORY_ROWS_SQL}
+  UNION
+  ${HISTORY_ROWS_SQL_V2}
+`;
+
+/** Probe: which history schemas exist in this database? (one row: legacy + v2 counts) */
+const CLI2_TABLES_PROBE_SQL = `
+  SELECT
+    (SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'message') AS legacyPresent,
+    (SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('session_message', 'session_v2')) AS v2Present
+`;
+
+/** Interpret the probe's result row as which schemas are available (issue #262). */
+export interface HistorySchemas {
+  legacy: boolean;
+  cli2: boolean;
+}
+
+export function parseHistorySchemasProbeRow(row: unknown): HistorySchemas {
+  const counts = row as { legacyPresent?: unknown; v2Present?: unknown } | null | undefined;
+  return {
+    legacy: typeof counts?.legacyPresent === "number" && counts.legacyPresent >= 1,
+    cli2: typeof counts?.v2Present === "number" && counts.v2Present >= 2,
+  };
+}
+
+/**
+ * Pick the history query for a database from its available schemas: the
+ * combined (CLI 1.x + 2.x UNION, deduplicated) query when both exist, the
+ * single-schema query when only one does. A missing table is a hard error at
+ * prepare time, so the choice must be made before running the history query
+ * — a fresh CLI 2.x install may not carry the legacy `message` table at all.
+ */
+export function selectHistoryRowsSql(schemas: HistorySchemas): string {
+  if (schemas.legacy && schemas.cli2) return HISTORY_ROWS_SQL_COMBINED;
+  return schemas.cli2 ? HISTORY_ROWS_SQL_V2 : HISTORY_ROWS_SQL;
+}
 
 export interface HistoryRow {
   createdMs: number;
@@ -304,7 +397,11 @@ function readHistoryViaNodeSqlite(): HistoryRow[] | null | undefined {
       try {
         const db = new DatabaseSync(OPENCODE_DB_PATH, { readOnly: true });
         try {
-          const rows = db.prepare(HISTORY_ROWS_SQL).all();
+          // Issue #262: CLI >= 2.0 moved per-message usage into session_message
+          // (with the cwd on the parent session_v2 row). Probe which schema
+          // exists, then run the matching query.
+          const probe = db.prepare(CLI2_TABLES_PROBE_SQL).all()[0];
+          const rows = db.prepare(selectHistoryRowsSql(parseHistorySchemasProbeRow(probe))).all();
           return rows.length > 0 ? normalizeHistoryRows(rows) : null;
         } finally {
           db.close();
@@ -347,14 +444,27 @@ function readHistoryViaSqliteCli(): HistoryRow[] | null {
   for (const binary of sqliteCliCandidates()) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const result = execFileSync(binary, ["-readonly", "-cmd", ".timeout 5000", "-json", OPENCODE_DB_PATH, HISTORY_ROWS_SQL], {
+        // Issue #262: probe the schema first (see readHistoryViaNodeSqlite).
+        const probeResult = execFileSync(binary, ["-readonly", "-cmd", ".timeout 5000", "-json", OPENCODE_DB_PATH, CLI2_TABLES_PROBE_SQL], {
           timeout: 10_000,
-          // 256MB: a power user's full CLI history JSON can exceed 64MB; a too-
-          // small cap silently makes the usage panel show no history at all.
-          maxBuffer: 256 * 1024 * 1024,
+          maxBuffer: 1024 * 1024,
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "pipe"],
         });
+        const probeRows: unknown = JSON.parse(probeResult);
+        const schemas = Array.isArray(probeRows) ? parseHistorySchemasProbeRow(probeRows[0]) : { legacy: true, cli2: false };
+        const result = execFileSync(
+          binary,
+          ["-readonly", "-cmd", ".timeout 5000", "-json", OPENCODE_DB_PATH, selectHistoryRowsSql(schemas)],
+          {
+            timeout: 10_000,
+            // 256MB: a power user's full CLI history JSON can exceed 64MB; a too-
+            // small cap silently makes the usage panel show no history at all.
+            maxBuffer: 256 * 1024 * 1024,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        );
         const rows: unknown = JSON.parse(result);
         return Array.isArray(rows) ? normalizeHistoryRows(rows) : null;
       } catch (error) {
