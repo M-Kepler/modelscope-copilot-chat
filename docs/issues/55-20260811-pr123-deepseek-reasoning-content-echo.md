@@ -15,6 +15,8 @@ Full review cycle for community contributor PR #123 by [@Fahad090NP](https://git
 
 This is the mirror image of the MiMo carve-out in issue #38: DeepSeek's upstream validator **requires** the previously emitted `reasoning_content` to be echoed back unchanged, while MiMo's validator **rejects** it. The extension must therefore gate the echo by model family.
 
+> **Historical note (2026-10-20):** The "MiniMax tolerated" classification established here was later found incomplete — MiniMax _tolerates_ the field but its upstream **silently ignores** it on replay, breaking interleaved-thinking continuity in agent loops. MiniMax now replays thinking inline as `<think>` tags inside `content` instead; see [feature doc 19](../features/19-20261020-minimax-interleaved-thinking-replay.md).
+
 ---
 
 ## Problem
