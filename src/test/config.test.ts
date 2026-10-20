@@ -199,7 +199,7 @@ describe("config — storage keys", () => {
 
 describe("config — autocomplete defaults", () => {
   it("keeps the inline-completion knobs in a usable range", () => {
-    assert.equal(DEFAULT_INLINE_MODEL, "qwen3.5-plus");
+    assert.equal(DEFAULT_INLINE_MODEL, "qwen3.6-plus");
     expectValue("debounce", DEFAULT_INLINE_DEBOUNCE_MS, (v) => v >= 50, "at least 50ms");
     expectValue("max tokens", DEFAULT_INLINE_MAX_TOKENS, (v) => v >= 16, "at least 16 tokens");
     expectValue("prefix lines", DEFAULT_INLINE_PREFIX_LINES, (v) => v >= 1, "at least 1 line");

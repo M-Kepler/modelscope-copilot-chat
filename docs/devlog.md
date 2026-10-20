@@ -1,6 +1,20 @@
 # 🧠 OPENCODE COPILOT CHAT DEVLOG
 
-**Branch:** `fix/issue244-followup-id-clobber` (work on `main`) | **Updated:** 2026-09-25 Asia/Jakarta | **Current Phase:** #244 follow-up fix complete + deep-verified (495/495 tests, lint 7/7, retry E2E 9/9, pre-release E2E 17/17); 0.7.8 pending push/PR/build.
+**Branch:** `fix/fim-default-model-dead` (work on `main`) | **Updated:** 2026-10-20 Asia/Jakarta | **Current Phase:** FIM default-model fix committed locally (`cb9f4f0`), docs synced (doc 113 + feature doc 15 + CHANGELOG `[Unreleased]`), real-key probe done — `qwen3.6-plus` verified 1459ms TTFB / `reasoningChars=0`; pending: push/PR approval.
+
+---
+
+## ✅ FIM Default Model Removed Upstream — inline suggestions silently dead — 2026-10-20
+
+**Scope:** inline suggestions produced nothing at all (reported via LinkedIn by Yannick Huebner), initially misread as Go budget exhaustion. `DEFAULT_INLINE_MODEL` (`qwen3.5-plus`) had been removed from the Go gateway, so every FIM request returned HTTP 400 `Model is unavailable` which the completion engine logs to the output channel and renders as nothing. The registry's deprecation filter never applied here: FIM sends the raw setting value straight to `/chat/completions`, bypassing the picker. This was the landmine doc 100 flagged on 2026-09-08 ("flagged, unchanged") — upstream finally dropped the model.
+
+**Verification without a paid key:** gateway validates in the order session → model → credential, so a dummy-key probe distinguishes the two failure classes: `qwen3.5-plus` → HTTP 400 `Model is unavailable` (before auth), `qwen3.6-plus` → HTTP 401 `Invalid credential` (model accepted). `qwen3.5-plus` is still served on Zen — the removal is Go-only, and suggestions are Go-only too.
+
+**Fix:** default → `qwen3.6-plus` (direct successor, same `enable_thinking=false` path); `package.json` enum also drops the equally-removed `deepseek-v4-flash` for `deepseek-v4.1-flash`; no settings auto-migration (same call as doc 112 — users on the old default switch manually once). Probe script refreshed to live candidates + required `x-opencode-session` header.
+
+**Real-key probe (2026-10-20, done):** `qwen3.6-plus` + `enable_thinking=false` → HTTP 200, TTFB 1459ms, total 1509ms, `reasoningChars=0` — on par with the old default (1518/1608ms), so the non-thinking rationale carries over; `suffix` field tolerated (HTTP 200); `qwen3.5-plus` re-confirmed HTTP 400.
+
+Docs: `docs/issues/113-20261020-fim-default-model-removed-upstream.md`, feature doc 15 updated, README inline-suggestions section, CHANGELOG `[Unreleased]`.
 
 ---
 
@@ -62,7 +76,7 @@ Docs: `docs/issues/100-20260923-issue226-thinking-default-echo.md`, `docs/issues
 
 **Verification:** `npm run lint` — all 7 checks, 462/462 tests. Unit-test locks caught 2 stale expectations during the change (metadata kimi context, usage tracker pricing) — both updated as part of the sync.
 
-**Caveats:** 1M context limits not live-verified against the gateway with oversized requests (models.dev is OpenCode's own registry but can lag — #171 precedent). `DEFAULT_INLINE_MODEL` is still upstream-deprecated `qwen3.5-plus` — flagged, unchanged.
+**Caveats:** 1M context limits not live-verified against the gateway with oversized requests (models.dev is OpenCode's own registry but can lag — #171 precedent). `DEFAULT_INLINE_MODEL` is still upstream-deprecated `qwen3.5-plus` — flagged, unchanged. _(Resolved 2026-10-20 — doc 113: upstream removed it from Go; default now `qwen3.6-plus`.)_
 
 Docs: `docs/issues/100-20260908-bundled-model-data-sync.md`, CHANGELOG `[Unreleased]`.
 

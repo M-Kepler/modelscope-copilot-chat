@@ -76,7 +76,8 @@ export const INLINE_TIMEOUT_MS_SETTING = "inlineSuggestionsTimeoutMs";
 export const INLINE_MAX_TOKENS_SETTING = "inlineSuggestionsMaxTokens";
 export const INLINE_PREFIX_LINES_SETTING = "inlineSuggestionsPrefixLines";
 export const INLINE_SUFFIX_CHARS_SETTING = "inlineSuggestionsSuffixChars";
-export const DEFAULT_INLINE_MODEL = "qwen3.5-plus";
+/** qwen3.5-plus was removed from the Go gateway (FIM requests 400'd silently). */
+export const DEFAULT_INLINE_MODEL = "qwen3.6-plus";
 export const DEFAULT_INLINE_DEBOUNCE_MS = 300;
 export const DEFAULT_INLINE_TIMEOUT_MS = 3_000;
 export const DEFAULT_INLINE_MAX_TOKENS = 128;

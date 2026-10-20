@@ -105,4 +105,6 @@ both ids behave identically). Updated to `hy3`.
   the #171 precedent (models.dev output values overstated) shows the gateway
   can lag. If a user reports context truncation on these models, re-verify.
 - `DEFAULT_INLINE_MODEL` is still `qwen3.5-plus`, which is upstream-deprecated.
-  Flagged for follow-up; not changed here.
+  Flagged for follow-up; not changed here. _(Resolved 2026-10-20: upstream removed
+  `qwen3.5-plus` from the Go gateway and requests 400'd silently — default
+  switched to `qwen3.6-plus` in [doc 113](113-20261020-fim-default-model-removed-upstream.md).)_
