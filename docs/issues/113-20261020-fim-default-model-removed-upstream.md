@@ -41,14 +41,14 @@ Key discovery: the gateway validates in the order session → model → credenti
 
 ## Decisions
 
-- **`qwen3.6-plus` as default, not `qwen3.8-flash`.** It is the direct successor, passes gateway model validation, and keeps the verified `enable_thinking=false` non-thinking path. No fresh TTFB measurement yet (needs a real key run of `scripts/probe-completion-latency.ts`), so latency claims were removed from descriptions rather than copied over from the dead model.
+- **`qwen3.6-plus` as default, not `qwen3.8-flash`.** It is the direct successor, passes gateway model validation, and keeps the verified `enable_thinking=false` non-thinking path. Re-measured live with a real key on 2026-10-20: 1459ms TTFB / 1509ms total with `reasoningChars=0` — on par with the old default's numbers (1518ms/1608ms), so the non-thinking rationale carries over intact.
 - **No settings auto-migration.** Same call as doc 112 (freeOnly): writing user configuration without permission is worse than a documented one-time manual switch. Users on the old default must set `"opencodego.inlineSuggestionsModel": "qwen3.6-plus"` once — communicated directly to the reporter.
 - **Silent-degradation design left as is.** Ghost text that half-works is worse than none, and the diagnostics output channel already logs every failure. Surfacing a toast per failed FIM request would spam on every keystroke. The real guard is keeping the default model alive (this fix) and the probe script making that cheap to re-verify.
 
 ## Verification
 
 - Dummy-key probe table above (root cause + workaround both live-verified).
+- Real-key probe run 2026-10-20 (`scripts/probe-completion-latency.ts`): `qwen3.6-plus` + `enable_thinking=false` → HTTP 200, TTFB 1459ms, total 1509ms, `reasoningChars=0`; with the `suffix` field → HTTP 200, TTFB 1660ms; `qwen3.5-plus` re-confirmed HTTP 400 `Model is unavailable`.
 - `npm run compile` — pass.
-- Follow-up before release: one real-key probe run to re-measure TTFB and confirm `reasoningChars=0` for `qwen3.6-plus` (`OPENCODE_KEY=… npx tsx scripts/probe-completion-latency.ts`).
 
 Follow-up to doc 100 (flagged, now fixed) | Detected via LinkedIn report, 2026-10-20

@@ -3,11 +3,11 @@
 # Inline Code Suggestions (Ghost Text) — Experimental (#49)
 
 **Topic:** autocomplete / inline-completions / ghost-text / fim / qwen / provider
-**Updated:** 2026-08-13
+**Updated:** 2026-10-20
 **Tags:** #autocomplete #inline-completions #ghost-text #fim #qwen #provider #feature
 **GitHub Issue:** [#49](https://github.com/ltmoerdani/opencode-copilot-chat/issues/49)
 **PR:** [#136](https://github.com/ltmoerdani/opencode-copilot-chat/pull/136) (+ #138 for the review fixes)
-**Related:** Issue doc [`25-20260617-inline-completions-fim-research.md`](../issues/25-20260617-inline-completions-fim-research.md)
+**Related:** Issue doc [`25-20260617-inline-completions-fim-research.md`](../issues/25-20260617-inline-completions-fim-research.md), [`113-20261020-fim-default-model-removed-upstream.md`](../issues/113-20261020-fim-default-model-removed-upstream.md)
 
 ---
 
@@ -17,14 +17,15 @@ Ghost-text inline completions (Copilot-style) while typing, powered by the OpenC
 
 ## Engine Decision (live-measured, not assumed)
 
-OpenCode exposes **no FIM endpoint** (`/completions` probed 404 on `zen/go`/`zen`/`beta`), and every opencode-go model is reasoning-first. A live latency probe (`scripts/probe-completion-latency.ts`, key from env only) measured:
+OpenCode exposes **no FIM endpoint** (`/completions` probed 404 on `zen/go`/`zen`/`beta`), and every opencode-go model is reasoning-first. A live latency probe (`scripts/probe-completion-latency.ts`, key from env only) measured, at feature launch (2026-08-13):
 
-| Model                                        | TTFB       | Total      | Hidden reasoning             |
-| -------------------------------------------- | ---------- | ---------- | ---------------------------- |
-| `deepseek-v4-flash` (no `reasoning_effort`)  | 1813ms     | 2264ms     | 128 chars — non-viable       |
-| **`qwen3.5-plus` (`enable_thinking=false`)** | **1518ms** | **1608ms** | **0 — genuine non-thinking** |
+| Model                                                               | TTFB       | Total      | Hidden reasoning             |
+| ------------------------------------------------------------------- | ---------- | ---------- | ---------------------------- |
+| `deepseek-v4-flash` (no `reasoning_effort`)                         | 1813ms     | 2264ms     | 128 chars — non-viable       |
+| **`qwen3.5-plus` (`enable_thinking=false`)**                        | **1518ms** | **1608ms** | **0 — genuine non-thinking** |
+| **`qwen3.6-plus` (`enable_thinking=false`)** — re-probed 2026-10-20 | **1459ms** | **1509ms** | **0 — genuine non-thinking** |
 
-So the default engine is **`qwen3.5-plus` with `enable_thinking: false`** — zero hidden reasoning, ~1.5s time-to-first-token. DeepSeek is intentionally **not** the default (burns hidden reasoning tokens even with thinking off).
+That probe chose `qwen3.5-plus` as the original default. Upstream has since **removed it from the Go gateway** (2026-10-20 — every FIM request 400'd silently; see [doc 113](../issues/113-20261020-fim-default-model-removed-upstream.md)), so the default is now **`qwen3.6-plus` with `enable_thinking: false`** — the direct successor on the same non-thinking path, re-measured live on 2026-10-20 at 1459ms TTFB with zero hidden reasoning (fastest of all candidates ever probed), with the gateway also still tolerating the `suffix` field on it (HTTP 200). DeepSeek is intentionally **not** the default (burns hidden reasoning tokens even with thinking off).
 
 ## How It Works
 
@@ -52,15 +53,15 @@ Because the gateway exposes no FIM endpoint, completions **emulate fill-in-the-m
 
 ## Settings (all under `opencodego.`)
 
-| Setting                        | Default        | Notes                                                                            |
-| ------------------------------ | -------------- | -------------------------------------------------------------------------------- |
-| `inlineSuggestions`            | `false`        | Opt-in master switch; requires a window reload                                   |
-| `inlineSuggestionsModel`       | `qwen3.5-plus` | Dropdown: `qwen3.5-plus` / `qwen3.6-plus` / `qwen3.7-plus` / `deepseek-v4-flash` |
-| `inlineSuggestionsDebounceMs`  | `300`          | 50–2000                                                                          |
-| `inlineSuggestionsTimeoutMs`   | `3000`         | 500–15000                                                                        |
-| `inlineSuggestionsMaxTokens`   | `128`          | 16–1024                                                                          |
-| `inlineSuggestionsPrefixLines` | `10`           | 1–100                                                                            |
-| `inlineSuggestionsSuffixChars` | `300`          | 0 disables the suffix                                                            |
+| Setting                        | Default        | Notes                                                             |
+| ------------------------------ | -------------- | ----------------------------------------------------------------- |
+| `inlineSuggestions`            | `false`        | Opt-in master switch; requires a window reload                    |
+| `inlineSuggestionsModel`       | `qwen3.6-plus` | Dropdown: `qwen3.6-plus` / `qwen3.7-plus` / `deepseek-v4.1-flash` |
+| `inlineSuggestionsDebounceMs`  | `300`          | 50–2000                                                           |
+| `inlineSuggestionsTimeoutMs`   | `3000`         | 500–15000                                                         |
+| `inlineSuggestionsMaxTokens`   | `128`          | 16–1024                                                           |
+| `inlineSuggestionsPrefixLines` | `10`           | 1–100                                                             |
+| `inlineSuggestionsSuffixChars` | `300`          | 0 disables the suffix                                             |
 
 ## Review Fixes (merged via #138)
 
