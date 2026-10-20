@@ -30,7 +30,11 @@ describe("describeFreeTierRestriction (issues #235/#240)", () => {
     );
     assert.ok(error instanceof OpenCodeRequestError);
     assert.match(error.userMessage, /restricts this free-tier model to their official app/);
+    // Chat renders `message` (issue #258): the hint must be there too, and the
+    // raw gateway text must not leak into the user-facing message.
+    assert.match(error.message, /restricts this free-tier model to their official app/);
     assert.match(error.message, /muse-spark-1.2-contributor-free/);
+    assert.doesNotMatch(error.message, /can only be used from within OpenCode/);
   });
 });
 

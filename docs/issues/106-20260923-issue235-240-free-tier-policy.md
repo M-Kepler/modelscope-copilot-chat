@@ -50,3 +50,9 @@ Paid models (OpenCode Go) are **not** affected. Any client that still serves fre
 ---
 
 Detected 2026-09-16 (#235) and 2026-09-22 (#240) | Reported by @gp-slick-coder, @AIlaowong | Fixed 2026-09-23
+
+---
+
+## Follow-up (2026-10-20) — doc 112
+
+The 0.7.6 fix only replaced the error text in the toast; chat still showed the raw gateway JSON, and the Zen picker (default `freeOnly: true`) kept steering users into the gated models. A Marketplace review surfaced both gaps. Free-tier Zen models are now hidden from the picker entirely, `freeOnly` is deprecated, and the hint renders in chat. Verified the gate is Zen-only — Go free models stay selectable. See [`112-20261020-zen-free-tier-policy-followup.md`](112-20261020-zen-free-tier-policy-followup.md).

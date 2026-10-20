@@ -399,6 +399,19 @@ export const TRANSIENT_FETCH_RETRY_JITTER_MS = 250;
 
 /** Zen free-model IDs that do not end in `-free`. */
 export const FREE_ZEN_MODEL_IDS = new Set(["big-pickle"]);
+
+/**
+ * CONTRACT: OpenCode gates Zen (Console) free-tier models to their own
+ * clients since 2026-09-17 (anomalyco/opencode#49580 — issues #235/#240), so
+ * third-party clients get HTTP 403 FreeTierError on every request. Applies to
+ * ZEN ONLY: Go free models (`beam-free`, `minimax-m3.1-flash-free`,
+ * `longcat-2.5-preview-free`) are unlimited within a paid Go subscription and
+ * Go explicitly permits third-party clients, so they must stay selectable.
+ * Remove this gate if upstream ever reopens the Zen free tier.
+ */
+export function isZenFreeTierModel(modelId: string): boolean {
+  return modelId.endsWith("-free") || FREE_ZEN_MODEL_IDS.has(modelId);
+}
 /**
  * Models removed upstream — always filtered from the picker.
  * `deepseek-v4-flash-free` / `laguna-s-2.1-free`: gone from the Zen gateway

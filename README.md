@@ -62,9 +62,8 @@
 1. **Install or update [VS Code](https://code.visualstudio.com/)** to version 1.125 or newer. OpenCode BYOK chat works without a GitHub sign-in or Copilot plan.
 2. **Install this extension** from the VS Code Marketplace (or press `F5` in this repo for dev mode).
 3. **Get an API key:**
-   - **Free models:** Sign up at [opencode.ai](https://opencode.ai) → grab an **OpenCode Zen** key. Several models are truly free (Big Pickle, DeepSeek V4 Flash Free, MiMo-V2.5 Free, and others rotate).
-   - **Paid Zen models (optional):** Add a payment method to your Zen account to unlock Claude Opus, GPT-5.5, Gemini, and other paid models at pay-as-you-go rates. Adding $20+ balance also improves rate limits on free models.
-   - **OpenCode Go (optional):** Subscribe to **OpenCode Go** ($10/mo, $5 first month promo) for curated open models like DeepSeek V4 Pro, Kimi K3, GLM-5.3, Qwen3.8 Max, MiMo V2.5 Pro.
+   - **OpenCode Zen (pay-as-you-go):** Sign up at [opencode.ai](https://opencode.ai), add billing, and grab an **OpenCode Zen** key for Claude, GPT-5.5, Gemini, and other models at pay-as-you-go rates.
+   - **OpenCode Go (optional):** Subscribe to **OpenCode Go** ($10/mo, $5 first month promo) for curated open models like DeepSeek V4 Pro, Kimi K3, GLM-5.3, Qwen3.8 Max, MiMo V2.5 Pro — including its free-tier models, unlimited while subscribed.
 4. **Open Copilot Chat** (Cmd/Ctrl+Shift+I, or click the Copilot icon).
 5. **Click the model picker** (current model name) → **Add Models…**
 6. **Select** **OpenCode Go** or **OpenCode Zen**.
@@ -77,7 +76,7 @@
 >
 > - Go and Zen are **separate provider groups**: both can be active simultaneously. Switch anytime from the picker.
 > - If a model shows in **Language Models** view but not the chat picker, hover its row and click the **eye icon (👁)** to enable it.
-> - Set `opencodego.freeOnly: false` to reveal **paid Zen models** in the picker.
+> - **Free-tier Zen models (names ending in `-free`, plus `big-pickle`) no longer work from VS Code:** since Sep 17, 2026 OpenCode restricts them to its own app/CLI (HTTP 403 for third-party clients). The extension hides them automatically — run them in the OpenCode app/CLI, or use paid Zen/Go models here.
 
 </details>
 
@@ -177,7 +176,7 @@ Add a payment method to your Zen account to unlock these models at pay-as-you-go
 | `minimax-m3`                                                                                            |       512,000 |    128,000 | $0.30 / $1.20                |
 | `minimax-m2.7`                                                                                          |       204,800 |    131,072 | $0.30 / $1.20                |
 
-> Set `opencodego.freeOnly: false` to show paid Zen models in the picker (default shows only free models).
+> Free-tier Zen models are hidden from the picker — OpenCode restricts them to its own app/CLI since Sep 17, 2026. Paid Zen models and all Go models (including Go's free-tier models) remain available.
 
 <details>
 <summary><b>🔬 How model metadata is resolved (3-tier fallback)</b></summary>

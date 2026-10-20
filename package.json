@@ -261,7 +261,7 @@
         "opencodego.freeOnly": {
           "type": "boolean",
           "default": true,
-          "description": "When enabled, only free OpenCode Zen models are shown in the Copilot model selector. Disable to include paid Zen models as well."
+          "description": "Deprecated: OpenCode restricts free Zen models to its own app/CLI since Sep 17, 2026 (403 for third-party clients), so the extension now always hides them and lists paid Zen models. This setting no longer has any effect."
         },
         "opencodego.enabled": {
           "type": "boolean",
