@@ -2,15 +2,13 @@ import * as vscode from "vscode";
 import {
   appendApiPath,
   apiRoutesFromBaseUrl,
-  CONFIG_SECTION,
   DEFAULT_GO_API_BASE_URL,
   DEFAULT_GO_GOOGLE_MODELS_URL,
   DEFAULT_ZEN_API_BASE_URL,
   FALLBACK_USER_AGENT,
-  FREE_ZEN_MODEL_IDS,
+  isZenFreeTierModel,
   normalizeApiBaseUrl,
   SETTING_API_BASE_URL,
-  SETTING_FREE_ONLY,
 } from "../config";
 import type { ModelEndpointKind } from "../core/registry";
 import type { ApiMessage } from "../request/types";
@@ -236,10 +234,11 @@ export const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition>
       "qwen3.5-plus",
       "big-pickle",
     ],
-    filterModel: (modelId) =>
-      vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>(SETTING_FREE_ONLY, true)
-        ? modelId.endsWith("-free") || FREE_ZEN_MODEL_IDS.has(modelId)
-        : true,
+    // Free-tier Zen models are always hidden: OpenCode gates them to its own
+    // clients since 2026-09-17 (403 FreeTierError, upstream #49580). The
+    // `freeOnly` setting is deprecated and deliberately ignored — honoring it
+    // would leave free-only users with a picker where every model 403s.
+    filterModel: (modelId) => !isZenFreeTierModel(modelId),
   };
   return {
     [GO_VENDOR]: go,

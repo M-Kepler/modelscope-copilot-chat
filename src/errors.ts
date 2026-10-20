@@ -55,8 +55,14 @@ export function buildOpenCodeRequestError(
     );
   }
 
-  const userMessage = `${providerDisplayName} API request failed (HTTP ${String(response.status)})${modelId ? ` for ${modelId}` : ""}: ${describeFreeTierRestriction(apiMessage) ?? describeRouterUnavailable(apiError, apiMessage)}${capacityHint}`;
-  const requestMessage = `${providerDisplayName} API request failed (${String(response.status)})${modelHint}${sizeHint}${capacityHint}: ${apiMessage}`;
+  // The actionable hint replaces the raw gateway detail in BOTH messages: VS
+  // Code's chat surface renders `message` (issue #258 — users saw raw gateway
+  // JSON with no explanation), while `userMessage` feeds the toast. The raw
+  // upstream body is still preserved in the provider output channel
+  // (`[http-error-body]` in transports/engine.ts), so no diagnostic is lost.
+  const hint = describeFreeTierRestriction(apiMessage) ?? describeRouterUnavailable(apiError, apiMessage);
+  const userMessage = `${providerDisplayName} API request failed (HTTP ${String(response.status)})${modelId ? ` for ${modelId}` : ""}: ${hint}${capacityHint}`;
+  const requestMessage = `${providerDisplayName} API request failed (${String(response.status)})${modelHint}${sizeHint}${capacityHint}: ${hint}`;
   return new OpenCodeRequestError(requestMessage, userMessage);
 }
 

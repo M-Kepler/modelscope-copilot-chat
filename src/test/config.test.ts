@@ -22,6 +22,7 @@ import {
   EXTENSION_ID,
   FALLBACK_USER_AGENT,
   FREE_ZEN_MODEL_IDS,
+  isZenFreeTierModel,
   GO_LIMITS,
   GO_MAX_LOG_ENTRIES,
   GO_MAX_SESSIONS,
@@ -175,6 +176,16 @@ describe("config — model classification sets", () => {
     for (const id of KNOWN_UNAVAILABLE_MODEL_IDS) {
       assert.ok(!FREE_ZEN_MODEL_IDS.has(id), `${id} is both unavailable and free`);
     }
+  });
+
+  it("classifies Zen free-tier models by suffix and known id (upstream #49580)", () => {
+    assert.ok(isZenFreeTierModel("deepseek-v4.1-flash-free"));
+    assert.ok(isZenFreeTierModel("big-pickle"));
+    // Go free-tier models share the -free suffix — the Zen filter is only
+    // applied to the Zen provider's filterModel, never globally.
+    assert.ok(isZenFreeTierModel("beam-free"));
+    assert.ok(!isZenFreeTierModel("gpt-5.4"));
+    assert.ok(!isZenFreeTierModel("deepseek-v4.1-flash"));
   });
 });
 

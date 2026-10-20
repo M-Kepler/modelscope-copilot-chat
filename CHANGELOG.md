@@ -2,6 +2,14 @@
 
 All notable changes to the **OpenCode Go BYOK Provider** extension are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **`[Models]` Free-tier Zen models are hidden from the picker, `opencodego.freeOnly` is deprecated, and every free-Zen claim is removed from the docs (Marketplace review, follow-up to #235/#240).** OpenCode has gated free-tier Zen models to its own app/CLI since Sep 17, 2026 (HTTP 403 for third-party clients — upstream anomalyco/opencode#49580), verified live against all 10 free models in the Zen catalog. With `freeOnly` defaulting to `true`, the Zen picker showed _only_ models that could never serve a request. Free-tier Zen models (`-free` suffix, plus `big-pickle`) are now always filtered out via a vendor-scoped `isZenFreeTierModel()` — the gate is Zen-only: Go's free models (`beam-free`, `minimax-m3.1-flash-free`, `longcat-2.5-preview-free`) are unlimited within a paid Go subscription, explicitly permitted for third-party clients, and remain selectable. `freeOnly` stays registered so existing settings don't error but no longer has any effect. README, extension description, and keywords no longer advertise free Zen models: the free-models table is replaced with a dated policy notice, and stale free claims (quick start, comparison table, FAQ, `free-models` keyword, "free Claude Opus" in the description) are corrected. Documented in `docs/issues/112-20261020-zen-free-tier-policy-followup.md`.
+
+- **`[Errors]` The free-tier / Router.Unavailable hint now renders in the chat, not only the toast (#258 follow-up).** `buildOpenCodeRequestError()` placed the actionable hint in `userMessage`, but VS Code's chat surface renders `error.message` — which carried the raw gateway JSON (`Error from provider (Console): OpenCode's free tier can only be used…`). The hint now replaces the raw detail in both messages; the upstream body is still preserved in the OpenCode output channel (`[http-error-body]`).
+
 ## [0.7.10] — unreleased
 
 ### Added
