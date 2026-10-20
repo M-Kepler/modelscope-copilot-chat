@@ -141,7 +141,10 @@ export const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition>
     messagesUrl: goRoutes.messagesUrl,
     responsesUrl: goRoutes.responsesUrl,
     usageUrl: goRoutes.usageUrl,
-    testModelId: "deepseek-v4-flash",
+    // Issue #261/#262 batch: `deepseek-v4-flash` is gone from the live Go
+    // catalog (replaced by v4.1). Test Connection must use a live model or it
+    // fails with "Model is unavailable" before ever validating the key.
+    testModelId: "deepseek-v4.1-flash",
     fallbackModels: [
       // Curated active set from models.dev (2026-09-08) — deprecated/legacy
       // models are excluded, mirroring the live catalog's own filtering.
@@ -182,7 +185,13 @@ export const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition>
     chatCompletionsUrl: zenRoutes.chatCompletionsUrl,
     messagesUrl: zenRoutes.messagesUrl,
     responsesUrl: zenRoutes.responsesUrl,
-    testModelId: "deepseek-v4-flash-free",
+    // Issue #261: `deepseek-v4-flash-free` is dead upstream (issue #204, in
+    // KNOWN_UNAVAILABLE_MODEL_IDS) — every Test Connection failed with
+    // "Model is unavailable". A live PAID model is used instead: the free
+    // tier also answers 403 FreeTierError to non-OpenCode clients, which
+    // cannot distinguish a valid key from an invalid one. v4.1-flash is the
+    // cheapest live model (~$0.30/1M in; max_tokens 10 ≈ negligible).
+    testModelId: "deepseek-v4.1-flash",
     fallbackModels: [
       "claude-opus-4-7",
       "claude-opus-4-6",
