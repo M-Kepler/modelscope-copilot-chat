@@ -131,7 +131,7 @@ Curated open coding models, refreshed live from the endpoint. Deprecated/legacy 
 
 ### ⚠️ Zen free models no longer work from VS Code (since Sep 17, 2026)
 
-OpenCode restricts free-tier Zen models — every model with a `-free` suffix, plus `big-pickle` — to its own app and CLI. Third-party clients like this extension get **HTTP 403** on every request to them. This is OpenCode's policy (effective **September 17, 2026**, see [anomalyco/opencode#49580](https://github.com/anomalyco/opencode/issues/49580)), not a bug in this extension.
+OpenCode restricts free-tier Zen models — every model with a `-free` suffix, plus `big-pickle` — to its own app and CLI. Third-party clients like this extension get **HTTP 403** on every request to them. This is OpenCode's policy (effective **September 17, 2026**, see [anomalyco/opencode#49580](https://github.com/anomalyco/opencode/issues/49580)), not a bug in this extension. Questions or reports: [pinned announcement #265](https://github.com/ltmoerdani/opencode-copilot-chat/issues/265).
 
 What still works:
 
