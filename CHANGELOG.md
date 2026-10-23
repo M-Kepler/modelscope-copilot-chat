@@ -8,6 +8,7 @@ Notable changes to ModelScope for Copilot Chat are recorded here.
 
 - ModelScope China and Global language-model providers, with Agents-window
   variants.
+- Provider management menus can set/update and remove region-specific API keys.
 - Read-only ModelScope Magicube balance refresh and status-bar display.
 - Separate status-bar indicators for token usage, response request quotas, and
   Magicube balance.

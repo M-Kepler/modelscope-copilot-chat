@@ -15,18 +15,38 @@ import {
 export function activate(context: vscode.ExtensionContext): void {
   const statusBar = startModelScopeStatusBars(context, async () => context.secrets.get(MODELSCOPE_CN_SECRET_KEY));
   const providers = {
-    [MODELSCOPE_CN_VENDOR]: new ModelScopeProvider(context, MODELSCOPE_PROVIDERS[MODELSCOPE_CN_VENDOR], (summary) => {
-      statusBar.recordRequest(summary);
-    }),
-    [MODELSCOPE_GLOBAL_VENDOR]: new ModelScopeProvider(context, MODELSCOPE_PROVIDERS[MODELSCOPE_GLOBAL_VENDOR], (summary) => {
-      statusBar.recordRequest(summary);
-    }),
-    [AGENT_MODELSCOPE_CN_VENDOR]: new ModelScopeProvider(context, MODELSCOPE_PROVIDERS[AGENT_MODELSCOPE_CN_VENDOR], (summary) => {
-      statusBar.recordRequest(summary);
-    }),
-    [AGENT_MODELSCOPE_GLOBAL_VENDOR]: new ModelScopeProvider(context, MODELSCOPE_PROVIDERS[AGENT_MODELSCOPE_GLOBAL_VENDOR], (summary) => {
-      statusBar.recordRequest(summary);
-    }),
+    [MODELSCOPE_CN_VENDOR]: new ModelScopeProvider(
+      context,
+      MODELSCOPE_PROVIDERS[MODELSCOPE_CN_VENDOR],
+      (summary) => {
+        statusBar.recordRequest(summary);
+      },
+      () => statusBar.refreshBalance(),
+    ),
+    [MODELSCOPE_GLOBAL_VENDOR]: new ModelScopeProvider(
+      context,
+      MODELSCOPE_PROVIDERS[MODELSCOPE_GLOBAL_VENDOR],
+      (summary) => {
+        statusBar.recordRequest(summary);
+      },
+      () => statusBar.refreshBalance(),
+    ),
+    [AGENT_MODELSCOPE_CN_VENDOR]: new ModelScopeProvider(
+      context,
+      MODELSCOPE_PROVIDERS[AGENT_MODELSCOPE_CN_VENDOR],
+      (summary) => {
+        statusBar.recordRequest(summary);
+      },
+      () => statusBar.refreshBalance(),
+    ),
+    [AGENT_MODELSCOPE_GLOBAL_VENDOR]: new ModelScopeProvider(
+      context,
+      MODELSCOPE_PROVIDERS[AGENT_MODELSCOPE_GLOBAL_VENDOR],
+      (summary) => {
+        statusBar.recordRequest(summary);
+      },
+      () => statusBar.refreshBalance(),
+    ),
   };
 
   const configuration = vscode.workspace.getConfiguration(CONFIG_SECTION);

@@ -37,6 +37,7 @@ import { estimateChatMessageTokenCount } from "./tokens";
 import { modelLimits, resolveRawModelId, shouldHideDeprecatedModel } from "./settings";
 
 import { getErrorMessage } from "../utils";
+import type { MagicubeBalanceResult } from "../modelscope/balance";
 
 import { prepareChatRequest, type ChatPrepDeps } from "./chatPrep";
 import { provideModelChatInformation, type ModelInfoDeps } from "./modelInfo";
@@ -53,6 +54,7 @@ export class ModelScopeProvider implements vscode.LanguageModelChatProvider<Mode
     this.changeEmitter.fire();
   }
   private readonly apiKeysByModelId = new Map<string, string>();
+  private readonly refreshBalanceCallback: (() => Promise<MagicubeBalanceResult>) | undefined;
 
   /**
    * globalState key tracking whether this vendor has a configured BYOK group
@@ -108,7 +110,9 @@ export class ModelScopeProvider implements vscode.LanguageModelChatProvider<Mode
     private readonly context: vscode.ExtensionContext,
     private readonly definition: ProviderDefinition,
     private readonly recordModelScopeRequest?: (summary: TransportRequestSummary) => void,
+    refreshBalance?: () => Promise<MagicubeBalanceResult>,
   ) {
+    this.refreshBalanceCallback = refreshBalance;
     this.transportLog = new TransportSummaryLog(context, definition.vendor);
     this.transportLog.restore();
   }
@@ -193,6 +197,16 @@ export class ModelScopeProvider implements vscode.LanguageModelChatProvider<Mode
         this.log(message);
       },
       refreshModels: () => this.refreshModels(),
+      refreshBalance: () => {
+        if (!this.refreshBalanceCallback) {
+          throw new Error("Magicube balance refresh is unavailable.");
+        }
+        return this.refreshBalanceCallback();
+      },
+      onApiKeyRemoved: () => {
+        this.apiKeysByModelId.clear();
+        this.changeEmitter.fire();
+      },
       showDiagnostics: () => this.showDiagnostics(),
     };
   }

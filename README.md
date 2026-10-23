@@ -34,9 +34,10 @@ independently when the extension activates and can be refreshed manually.
 2. Package and install this extension from a VSIX, or install it from the
    Marketplace after it is published.
 3. Open Copilot Chat, open the model picker, and choose **Add Models…**.
-4. Add **ModelScope China** or **ModelScope Global**, then enter your
-   ModelScope API key.
-5. Select a ModelScope model and start a chat.
+4. Add **ModelScope China** or **ModelScope Global**.
+5. Open **ModelScope China: Manage** or **ModelScope Global: Manage** and
+   choose **Set/Update API Key**.
+6. Select a ModelScope model and start a chat.
 
 China and Global API keys are stored independently. The Magicube balance
 endpoint uses only the China key, so the balance indicator can show an
@@ -45,15 +46,15 @@ endpoint. Global chat remains independent of Magicube balance.
 
 ## Commands
 
-| Command                                  | Purpose                                                                   |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| **ModelScope China: Manage**             | Test the connection, refresh China models, or open provider diagnostics.  |
-| **ModelScope Global: Manage**            | Test the connection, refresh Global models, or open provider diagnostics. |
-| **ModelScope: Refresh Models**           | Refresh both provider model lists.                                        |
-| **ModelScope: Show Diagnostics**         | Choose a provider and inspect its models and recent requests.             |
-| **ModelScope: Diagnose Model Picker**    | Inspect models currently visible to VS Code.                              |
-| **ModelScope: Set Thinking Effort**      | Set a default thinking effort for a supported model family.               |
-| **ModelScope: Refresh Magicube Balance** | Immediately request a read-only balance refresh.                          |
+| Command                                  | Purpose                                                                                            |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **ModelScope China: Manage**             | Set/update or remove the China API key, test the connection, refresh models, or open diagnostics.  |
+| **ModelScope Global: Manage**            | Set/update or remove the Global API key, test the connection, refresh models, or open diagnostics. |
+| **ModelScope: Refresh Models**           | Refresh both provider model lists.                                                                 |
+| **ModelScope: Show Diagnostics**         | Choose a provider and inspect its models and recent requests.                                      |
+| **ModelScope: Diagnose Model Picker**    | Inspect models currently visible to VS Code.                                                       |
+| **ModelScope: Set Thinking Effort**      | Set a default thinking effort for a supported model family.                                        |
+| **ModelScope: Refresh Magicube Balance** | Immediately request a read-only balance refresh.                                                   |
 
 ## Settings
 
