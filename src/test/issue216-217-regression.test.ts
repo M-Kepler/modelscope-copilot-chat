@@ -164,8 +164,7 @@ describe("#216 Test B: history trim keeps function_call pairing intact", () => {
       ...toolCallGroup("call_b", "b.ts", 3000),
       { role: "user", content: "final" },
     ];
-    const trimmed = trimOldMessagesToFitContext(messages as never, 500, historyByteCapForBudget(500));
-    void trimmed;
+    trimOldMessagesToFitContext(messages as never, 500, historyByteCapForBudget(500));
     const items = pairResponsesFunctionCallItems(messages.flatMap((m) => responsesInputItemsFromMessage(m as never)));
     const calls = items.filter((i) => i.type === "function_call").map((i) => i.call_id);
     const outs = items.filter((i) => i.type === "function_call_output").map((i) => i.call_id);
