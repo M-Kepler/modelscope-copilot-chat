@@ -12,7 +12,7 @@ const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), "package.json
   contributes: {
     commands: { command: string }[];
     configuration: { properties: Record<string, unknown> };
-    languageModelChatProviders: { vendor: string }[];
+    languageModelChatProviders: { vendor: string; displayName: string }[];
   };
 };
 
@@ -27,6 +27,20 @@ describe("ModelScope package contributions", () => {
       packageJson.contributes.languageModelChatProviders.map(({ vendor }) => vendor).sort(),
       ["modelscopeglobal", "modelscopeglobal-agent", "modelscopecn", "modelscopecn-agent"].sort(),
     );
+  });
+
+  it("uses distinct labels for the normal and Agents providers", () => {
+    const providers = packageJson.contributes.languageModelChatProviders;
+    const labels = providers.map(({ displayName }) => displayName);
+
+    assert.equal(new Set(labels).size, providers.length);
+    assert.deepEqual(Object.fromEntries(providers.map(({ vendor, displayName }) => [vendor, displayName])), {
+      modelscopecn: "ModelScope China",
+      "modelscopecn-agent": "ModelScope China (Agents)",
+      modelscopeglobal: "ModelScope Global",
+      "modelscopeglobal-agent": "ModelScope Global (Agents)",
+    });
+    assert.ok(providers.filter(({ vendor }) => vendor.endsWith("-agent")).every(({ displayName }) => displayName.includes("(Agents)")));
   });
 
   it("does not contribute OpenCode vendors, commands, or settings", () => {

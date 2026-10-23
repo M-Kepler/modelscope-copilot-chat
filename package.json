@@ -49,13 +49,13 @@
       },
       {
         "vendor": "modelscopecn-agent",
-        "displayName": "ModelScope China",
+        "displayName": "ModelScope China (Agents)",
         "managementCommand": "modelscope.cn.manage",
         "when": "config.modelscope.enabled && config.modelscope.agentsWindow"
       },
       {
         "vendor": "modelscopeglobal-agent",
-        "displayName": "ModelScope Global",
+        "displayName": "ModelScope Global (Agents)",
         "managementCommand": "modelscope.global.manage",
         "when": "config.modelscope.enabled && config.modelscope.agentsWindow"
       }

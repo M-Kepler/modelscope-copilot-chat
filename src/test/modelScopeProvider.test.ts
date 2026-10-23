@@ -72,6 +72,8 @@ describe("ModelScope provider definitions", () => {
     assert.equal(providers[MODELSCOPE_GLOBAL_VENDOR].chatCompletionsUrl, "https://api-inference.modelscope.ai/v1/chat/completions");
     assert.equal(providers[AGENT_MODELSCOPE_CN_VENDOR].baseVendor, MODELSCOPE_CN_VENDOR);
     assert.equal(providers[AGENT_MODELSCOPE_GLOBAL_VENDOR].baseVendor, MODELSCOPE_GLOBAL_VENDOR);
+    assert.equal(providers[AGENT_MODELSCOPE_CN_VENDOR].displayName, "ModelScope China (Agents)");
+    assert.equal(providers[AGENT_MODELSCOPE_GLOBAL_VENDOR].displayName, "ModelScope Global (Agents)");
     assert.ok(providers[MODELSCOPE_CN_VENDOR].fallbackModels.includes("Qwen/Qwen3.5-27B"));
     assert.ok(providers[MODELSCOPE_GLOBAL_VENDOR].fallbackModels.includes("Qwen/Qwen3.5-27B"));
   });
