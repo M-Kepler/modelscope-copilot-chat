@@ -6,7 +6,7 @@ import {
   type MetadataVendor,
   type AllProviderVendor,
 } from "../providerTypes";
-import { MODEL_LIMITS_BY_PROVIDER, MODELS_WITHOUT_TEMPERATURE, VISION_CAPABLE_MODELS } from "./modelTables";
+import { MODEL_LIMITS_BY_PROVIDER, MODELS_WITHOUT_TEMPERATURE, MODELSCOPE_CONTEXT_WINDOWS, VISION_CAPABLE_MODELS } from "./modelTables";
 
 export interface BaseModelLimits {
   contextWindow: number;
@@ -145,8 +145,8 @@ interface ModelsDevProviderRecord {
 export interface ModelsDevResponse {
   opencode?: ModelsDevProviderRecord;
   "opencode-go"?: ModelsDevProviderRecord;
-  modelscopecn?: ModelsDevProviderRecord;
-  modelscopeglobal?: ModelsDevProviderRecord;
+  /** models.dev's single ModelScope provider (api-inference.modelscope.cn). */
+  modelscope?: ModelsDevProviderRecord;
 }
 
 import {
@@ -167,8 +167,12 @@ const DEFAULT_MODEL_LIMITS: BaseModelLimits = {
 const MODELS_DEV_PROVIDER_BY_VENDOR: Record<MetadataVendor, keyof ModelsDevResponse> = {
   [GO_VENDOR]: "opencode-go",
   [ZEN_VENDOR]: "opencode",
-  [MODELSCOPE_CN_VENDOR]: "modelscopecn",
-  [MODELSCOPE_GLOBAL_VENDOR]: "modelscopeglobal",
+  // models.dev exposes ModelScope only as `modelscope`. Its context/output
+  // limits describe the model itself, so the Global region reuses them —
+  // looking up the non-existent `modelscopecn`/`modelscopeglobal` keys left
+  // every ModelScope model on the 262K default.
+  [MODELSCOPE_CN_VENDOR]: "modelscope",
+  [MODELSCOPE_GLOBAL_VENDOR]: "modelscope",
 };
 
 export function isFreeModel(modelId: string): boolean {
@@ -201,15 +205,17 @@ export function bundledModelMetadataSnapshot(): CachedModelMetadataSnapshot {
 
 export function fallbackModelMetadata(modelId: string, vendor: MetadataVendor): ModelMetadataFields | undefined {
   const limits = MODEL_LIMITS_BY_PROVIDER[vendor][modelId];
+  const declaredContextWindow =
+    vendor === MODELSCOPE_CN_VENDOR || vendor === MODELSCOPE_GLOBAL_VENDOR ? MODELSCOPE_CONTEXT_WINDOWS[modelId] : undefined;
   const supportsVision = VISION_CAPABLE_MODELS.has(modelId);
   const status = vendor === ZEN_VENDOR && modelId === "minimax-m2.5-free" ? "deprecated" : undefined;
 
-  if (!limits && !supportsVision && !status && !supportsReasoning(modelId)) {
+  if (!limits && declaredContextWindow === undefined && !supportsVision && !status && !supportsReasoning(modelId)) {
     return undefined;
   }
 
   return {
-    contextWindow: limits?.contextWindow,
+    contextWindow: limits?.contextWindow ?? declaredContextWindow,
     maxOutputTokens: limits?.maxOutputTokens,
     supportsVision: supportsVision || undefined,
     reasoning: supportsReasoning(modelId) || undefined,

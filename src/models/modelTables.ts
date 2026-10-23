@@ -99,6 +99,58 @@ export const MODEL_LIMITS_BY_PROVIDER: Record<MetadataVendor, Record<string, Bas
 };
 
 /**
+ * Context windows declared by each ModelScope model's own `config.json`
+ * (`max_position_embeddings`), read from
+ * `modelscope.cn/api/v1/models/{id}/repo?FilePath=config.json` on 2026-10-23.
+ *
+ * ModelScope's `/v1/models` and model-detail APIs expose no runtime limit, and
+ * models.dev lists no model that appears in the inference catalog, so the
+ * model config is the only per-model source. Both regions share these values —
+ * the same weights back both endpoints.
+ *
+ * Ids missing here keep `DEFAULT_MODEL_CONTEXT_WINDOW`: image-edit endpoints
+ * and early-access previews have no readable config, and `MiniMax/MiniMax-M1-80k`
+ * is excluded because its config declares 10240000 while the model is published
+ * as an 80K-output / 1M-context model — advertising that value would let prompts
+ * grow past what the endpoint accepts.
+ */
+export const MODELSCOPE_CONTEXT_WINDOWS: Record<string, number> = {
+  "MedAIBase/AntAngelMed": 32768,
+  "opencompass/CompassJudger-1-32B-Instruct": 32768,
+  "XGenerationLab/XiYanSQL-QwenCoder-32B-2412": 32768,
+  "XGenerationLab/XiYanSQL-QwenCoder-32B-2504": 32768,
+  "OpenGVLab/InternVL3_5-241B-A28B": 40960,
+  "Shanghai_AI_Laboratory/Intern-S1": 65536,
+  "Shanghai_AI_Laboratory/Intern-S1-mini": 65536,
+  "mistralai/Mistral-Large-Instruct-2407": 131072,
+  "PaddlePaddle/ERNIE-4.5-0.3B-PT": 131072,
+  "PaddlePaddle/ERNIE-4.5-21B-A3B-PT": 131072,
+  "PaddlePaddle/ERNIE-4.5-300B-A47B-PT": 131072,
+  "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-PT": 131072,
+  "ZhipuAI/GLM-4.7-Flash": 202752,
+  "nex-agi/Nex-N2.5-mini": 262144,
+  "nex-agi/Nex-N2.5-Pro": 262144,
+  "Qwen/Qwen3.5-122B-A10B": 262144,
+  "Qwen/Qwen3.5-27B": 262144,
+  "Qwen/Qwen3.5-35B-A3B": 262144,
+  "Qwen/Qwen3.5-397B-A17B": 262144,
+  "Qwen/Qwen3.8-27B": 262144,
+  "Qwen/Qwen3.8-Flash-Next": 262144,
+  "Shanghai_AI_Laboratory/Intern-S2-Preview": 262144,
+  "stepfun-ai/Step-3.5-Flash": 262144,
+  "stepfun-ai/Step-3.7-Flash": 262144,
+  "meituan-longcat/LongCat-Flash-Lite": 327680,
+  "MiniMax/MiniMax-M3": 1048576,
+  "ZhipuAI/GLM-5.2": 1048576,
+  "deepseek-ai/DeepSeek-V4-Flash-0731": 1048576,
+  "deepseek-ai/DeepSeek-V4-Pro": 1048576,
+  "deepseek-ai/DeepSeek-V4-Pro-0813": 1048576,
+  "deepseek-ai/DeepSeek-V4.1-Flash": 1048576,
+  "deepseek-ai/DeepSeek-V4.1-Flash-1017": 1048576,
+  "stepfun-ai/Step-5-Preview": 1048576,
+};
+
+/**
  * Models where the `temperature` request parameter is unsupported / deprecated.
  * The upstream API rejects any non-default temperature with HTTP 400 for these.
  * Mirrors the models.dev `temperature: false` flag so the extension still

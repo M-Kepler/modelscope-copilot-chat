@@ -5,11 +5,80 @@ import {
   getContextSizeOptionsForModel,
   isFreeModel,
   normalizeLiveModelMetadata,
+  normalizeModelsDevSnapshot,
   resolveModelMetadata,
   VISION_CAPABLE_MODELS,
   type CachedModelMetadataSnapshot,
 } from "../models/metadata.js";
-import { GO_VENDOR, ZEN_VENDOR } from "../providerTypes.js";
+import { GO_VENDOR, MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR, ZEN_VENDOR } from "../providerTypes.js";
+
+/**
+ * models.dev publishes ModelScope metadata under the provider key `modelscope`
+ * (api-inference.modelscope.cn). Looking up `modelscopecn` / `modelscopeglobal`
+ * silently produced no limits, so every model fell back to the 262K default.
+ */
+describe("normalizeModelsDevSnapshot — ModelScope provider key", () => {
+  const modelsDevPayload = {
+    modelscope: {
+      models: {
+        "Qwen/Qwen3-Coder-30B-A3B-Instruct": { limit: { context: 262144, output: 65536 }, tool_call: true },
+        "ZhipuAI/GLM-4.6": { limit: { context: 202752, output: 98304 }, reasoning: true },
+      },
+    },
+  };
+
+  it("maps the models.dev modelscope provider into both ModelScope vendors", () => {
+    const snapshot = normalizeModelsDevSnapshot(modelsDevPayload);
+
+    for (const vendor of [MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR]) {
+      const entry = snapshot.providers[vendor]?.["Qwen/Qwen3-Coder-30B-A3B-Instruct"];
+      assert.ok(entry, `${vendor} should inherit models.dev ModelScope metadata`);
+      assert.equal(entry.contextWindow, 262144);
+      assert.equal(entry.maxOutputTokens, 65536);
+    }
+  });
+
+  it("resolves non-default limits instead of the 262K fallback", () => {
+    const snapshot = normalizeModelsDevSnapshot(modelsDevPayload);
+    const resolved = resolveModelMetadata("ZhipuAI/GLM-4.6", MODELSCOPE_CN_VENDOR, snapshot, new Map());
+
+    assert.equal(resolved.source, "models.dev");
+    assert.equal(resolved.contextWindow, 202752);
+    assert.equal(resolved.maxOutputTokens, 98304);
+  });
+});
+
+/**
+ * ModelScope publishes no runtime context limit, so `MODELSCOPE_CONTEXT_WINDOWS`
+ * carries the windows declared by each model's own `config.json`. Without it,
+ * every model advertised the 262K default regardless of its real size.
+ */
+describe("fallbackModelMetadata — ModelScope config windows", () => {
+  const emptySnapshot = {
+    fetchedAt: Date.now(),
+    providers: { [MODELSCOPE_CN_VENDOR]: {}, [MODELSCOPE_GLOBAL_VENDOR]: {} },
+  } as CachedModelMetadataSnapshot;
+
+  it("advertises the declared window in both regions", () => {
+    for (const vendor of [MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR]) {
+      assert.equal(resolveModelMetadata("deepseek-ai/DeepSeek-V4.1-Flash-1017", vendor, emptySnapshot, new Map()).contextWindow, 1048576);
+      assert.equal(resolveModelMetadata("Qwen/Qwen3.5-27B", vendor, emptySnapshot, new Map()).contextWindow, 262144);
+      assert.equal(resolveModelMetadata("MedAIBase/AntAngelMed", vendor, emptySnapshot, new Map()).contextWindow, 32768);
+    }
+  });
+
+  it("keeps the default for models without a readable config", () => {
+    // Image-edit endpoints declare no window.
+    const resolved = resolveModelMetadata("MusePublic/Qwen-Image-Edit", MODELSCOPE_CN_VENDOR, emptySnapshot, new Map());
+    assert.equal(resolved.source, "default");
+    assert.equal(resolved.contextWindow, 262144);
+  });
+
+  it("ignores the implausible MiniMax-M1-80k config value", () => {
+    const resolved = resolveModelMetadata("MiniMax/MiniMax-M1-80k", MODELSCOPE_CN_VENDOR, emptySnapshot, new Map());
+    assert.equal(resolved.contextWindow, 262144);
+  });
+});
 
 describe("isFreeModel — ModelScope model ids", () => {
   it("recognizes free-tier suffixes without OpenCode-specific model ids", () => {
