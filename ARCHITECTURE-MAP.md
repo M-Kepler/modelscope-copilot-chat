@@ -61,6 +61,8 @@ registered or exposed as a product feature here.
   status-bar state; successful cached data may be shown as stale.
 - Model-family and thinking-strategy lookup strips the owner prefix from
   `owner/model` IDs before applying registry patterns.
+- Keep the provider connection-test model available in both regions' live model
+  catalogs so connection checks validate credentials rather than a retired ID.
 - Keep provider registration, VS Code manifest contributions and tests in
   sync when changing a vendor or command.
 

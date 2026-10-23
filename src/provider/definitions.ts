@@ -107,7 +107,7 @@ function createProviderDefinition(
     modelsUrl: `${endpoint}/models`,
     chatCompletionsUrl: `${endpoint}/chat/completions`,
     messagesUrl: `${endpoint}/chat/completions`,
-    testModelId: "Qwen/Qwen3-8B",
+    testModelId: "Qwen/Qwen3.5-27B",
     fallbackModels: [...FALLBACK_MODELS],
   };
 }

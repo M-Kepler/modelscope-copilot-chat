@@ -12,12 +12,18 @@ const vscodeMock: {
     showQuickPick: (items: QuickPickItem[], options?: { title?: string; placeHolder?: string }) => Promise<QuickPickItem | undefined>;
     showInputBox: (options: { password?: boolean; prompt?: string }) => Promise<string | undefined>;
     showWarningMessage: (message: string, ...items: string[]) => Promise<string | undefined>;
+    showInformationMessage: (message: string) => Promise<string | undefined>;
+    showErrorMessage: (message: string) => Promise<string | undefined>;
+    setStatusBarMessage: (message: string) => { dispose(): void };
   };
 } = {
   window: {
     showQuickPick: () => Promise.resolve(undefined),
     showInputBox: () => Promise.resolve(undefined),
     showWarningMessage: () => Promise.resolve(undefined),
+    showInformationMessage: () => Promise.resolve(undefined),
+    showErrorMessage: () => Promise.resolve(undefined),
+    setStatusBarMessage: () => ({ dispose: () => undefined }),
   },
 };
 
@@ -33,9 +39,14 @@ moduleLoader._load = function (request, parent, isMain) {
 };
 
 let manageProvider: typeof import("../provider/providerDialogs.js").manageProvider;
+let testConnection: typeof import("../provider/providerDialogs.js").testConnection;
+let chinaProvider: typeof import("../provider/definitions.js").MODELSCOPE_PROVIDERS.modelscopecn;
 
 before(async () => {
-  ({ manageProvider } = await import("../provider/providerDialogs.js"));
+  ({ manageProvider, testConnection } = await import("../provider/providerDialogs.js"));
+  ({
+    MODELSCOPE_PROVIDERS: { modelscopecn: chinaProvider },
+  } = await import("../provider/definitions.js"));
 });
 
 after(() => {
@@ -185,5 +196,36 @@ describe("ModelScope provider key management", () => {
 
     await assert.rejects(manageProvider(deps), (error: unknown) => error === storageError);
     assert.deepEqual(calls, { refreshModels: 0, refreshBalance: 0, onApiKeyRemoved: 0 });
+  });
+});
+
+describe("ModelScope provider connection test", () => {
+  it("uses a model currently listed by both ModelScope inference regions", async () => {
+    const { deps } = createDeps("china", new Map([[MODELSCOPE_CN_SECRET_KEY, "unit-test-api-key"]]));
+    deps.definition = chinaProvider;
+    const originalFetch = globalThis.fetch;
+    let requestedModel: string | undefined;
+    let shownError = false;
+    vscodeMock.window.showErrorMessage = () => {
+      shownError = true;
+      return Promise.resolve(undefined);
+    };
+    globalThis.fetch = (_input, init) => {
+      if (typeof init?.body !== "string") {
+        throw new Error("Expected a JSON request body");
+      }
+      const body = JSON.parse(init.body) as { model: string };
+      requestedModel = body.model;
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    };
+
+    try {
+      await testConnection(deps);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(requestedModel, "Qwen/Qwen3.5-27B");
+    assert.equal(shownError, false);
   });
 });
