@@ -12,26 +12,29 @@ interface RateLimitInfo {
   requestRemaining?: string;
   tokenLimit?: string;
   tokenRemaining?: string;
+  userRequestLimit?: string;
+  userRequestRemaining?: string;
+  modelRequestLimit?: string;
+  modelRequestRemaining?: string;
 }
 
-export class OpenCodeRequestError extends Error {
+export class ModelScopeRequestError extends Error {
   constructor(
     message: string,
     readonly userMessage: string = message,
   ) {
     super(message);
-    this.name = "OpenCodeRequestError";
+    this.name = "ModelScopeRequestError";
   }
 }
 
-export function buildOpenCodeRequestError(
+export function buildModelScopeRequestError(
   providerDisplayName: string,
   response: Response,
   rawDetail: string,
   modelId: string | undefined,
   payloadBytes: number,
-  capacityHint: string,
-): OpenCodeRequestError {
+): ModelScopeRequestError {
   const apiError = parseApiError(rawDetail);
   const rateLimitInfo = readRateLimitInfo(response.headers);
   const modelHint = modelId ? ` model=${modelId}` : "";
@@ -49,39 +52,21 @@ export function buildOpenCodeRequestError(
       quotaText ? `Quota: ${quotaText}.` : undefined,
     ].filter((part): part is string => Boolean(part));
     const userMessage = `${providerDisplayName}: ${reason}${modelId ? ` (${modelId})` : ""}. ${details.join(" ")}`.trim();
-    return new OpenCodeRequestError(
-      `${providerDisplayName} API rate/quota limit (${String(response.status)})${modelHint}${sizeHint}: ${apiMessage}; ${quotaText || "no quota headers"}`,
+    const requestFailure =
+      reason === "ModelScope request quota exceeded" ? "request quota exceeded" : `${reason} (HTTP ${String(response.status)})`;
+    return new ModelScopeRequestError(
+      `${providerDisplayName} API ${requestFailure}${modelHint}${sizeHint}: ${apiMessage}; ${quotaText || "no quota headers"}`,
       userMessage,
     );
   }
 
   // The actionable hint replaces the raw gateway detail in BOTH messages: VS
-  // Code's chat surface renders `message` (issue #258 — users saw raw gateway
-  // JSON with no explanation), while `userMessage` feeds the toast. The raw
-  // upstream body is still preserved in the provider output channel
-  // (`[http-error-body]` in transports/engine.ts), so no diagnostic is lost.
-  const hint = describeFreeTierRestriction(apiMessage) ?? describeRouterUnavailable(apiError, apiMessage);
-  const userMessage = `${providerDisplayName} API request failed (HTTP ${String(response.status)})${modelId ? ` for ${modelId}` : ""}: ${hint}${capacityHint}`;
-  const requestMessage = `${providerDisplayName} API request failed (${String(response.status)})${modelHint}${sizeHint}${capacityHint}: ${hint}`;
-  return new OpenCodeRequestError(requestMessage, userMessage);
-}
-
-/**
- * Replace the raw gateway detail with an actionable hint when the request was
- * rejected because the model is on OpenCode's free tier, which since Sep 17,
- * 2026 is restricted to OpenCode's own clients (issues #235/#240 — policy, not
- * a bug; bypassing it would violate OpenCode's terms). Returns undefined for
- * any other error so the router/limit hints keep handling their cases.
- */
-export function describeFreeTierRestriction(apiMessage: string): string | undefined {
-  if (!/free tier can only be used from within opencode/i.test(apiMessage)) {
-    return undefined;
-  }
-  return (
-    "OpenCode restricts this free-tier model to their official app " +
-    "(effective Sep 17, 2026). Use a paid OpenCode Go model, or run free models " +
-    "in the OpenCode app/CLI."
-  );
+  // Code's chat surface renders `message`, while `userMessage` feeds the toast.
+  // The raw upstream body is preserved in the provider output channel.
+  const hint = describeRouterUnavailable(apiError, apiMessage);
+  const userMessage = `${providerDisplayName} API request failed (HTTP ${String(response.status)})${modelId ? ` for ${modelId}` : ""}: ${hint}`;
+  const requestMessage = `${providerDisplayName} API request failed (HTTP ${String(response.status)})${modelHint}${sizeHint}: ${hint}`;
+  return new ModelScopeRequestError(requestMessage, userMessage);
 }
 
 /**
@@ -94,7 +79,7 @@ function describeRouterUnavailable(apiError: ParsedApiError, fallback: string): 
   if (!type.includes("routerunavailable")) {
     return fallback;
   }
-  return "OpenCode's router has no healthy backend for this model right now. Retry in a few seconds, or switch to another model.";
+  return "The upstream router has no healthy backend for this model right now. Retry in a few seconds, or switch to another model.";
 }
 
 export function truncateForLog(value: string, max = 1200): string {
@@ -142,6 +127,10 @@ export function readRateLimitInfo(headers: Headers): RateLimitInfo {
   ]);
   const tokenLimit = firstHeader(headers, ["x-ratelimit-limit-tokens", "anthropic-ratelimit-tokens-limit"]);
   const tokenRemaining = firstHeader(headers, ["x-ratelimit-remaining-tokens", "anthropic-ratelimit-tokens-remaining"]);
+  const userRequestLimit = firstHeader(headers, ["modelscope-ratelimit-requests-limit"]);
+  const userRequestRemaining = firstHeader(headers, ["modelscope-ratelimit-requests-remaining"]);
+  const modelRequestLimit = firstHeader(headers, ["modelscope-ratelimit-model-requests-limit"]);
+  const modelRequestRemaining = firstHeader(headers, ["modelscope-ratelimit-model-requests-remaining"]);
   const reset = firstHeader(headers, [
     "x-ratelimit-reset-requests",
     "x-ratelimit-reset-tokens",
@@ -158,6 +147,10 @@ export function readRateLimitInfo(headers: Headers): RateLimitInfo {
     requestRemaining,
     tokenLimit,
     tokenRemaining,
+    userRequestLimit,
+    userRequestRemaining,
+    modelRequestLimit,
+    modelRequestRemaining,
   };
 }
 
@@ -169,6 +162,12 @@ export function formatRateLimitSummary(info: RateLimitInfo): string | undefined 
     info.tokenRemaining || info.tokenLimit
       ? `tokens remaining=${info.tokenRemaining ?? "?"}${info.tokenLimit ? `/${info.tokenLimit}` : ""}`
       : undefined,
+    info.userRequestRemaining || info.userRequestLimit
+      ? `account requests remaining=${info.userRequestRemaining ?? "?"}${info.userRequestLimit ? `/${info.userRequestLimit}` : ""}`
+      : undefined,
+    info.modelRequestRemaining || info.modelRequestLimit
+      ? `model requests remaining=${info.modelRequestRemaining ?? "?"}${info.modelRequestLimit ? `/${info.modelRequestLimit}` : ""}`
+      : undefined,
     info.retryAfterMs !== undefined ? `retry-after=${formatDuration(info.retryAfterMs)}` : undefined,
     info.resetAfterMs !== undefined ? `reset=${formatDuration(info.resetAfterMs)}` : undefined,
   ].filter((part): part is string => Boolean(part));
@@ -178,20 +177,10 @@ export function formatRateLimitSummary(info: RateLimitInfo): string | undefined 
 
 function classifyRateLimit(apiError: ParsedApiError, status: number): string {
   const code = `${apiError.code ?? ""} ${apiError.type ?? ""} ${apiError.message ?? ""}`.toLowerCase();
-  const compactCode = compactErrorCode(code);
-  if (compactCode.includes("gosubscriptionrollinglimitexceeded")) {
-    return "5-hour OpenCode Go usage limit reached";
-  }
-  if (compactCode.includes("gosubscriptionweeklylimitexceeded")) {
-    return "weekly OpenCode Go usage limit reached";
-  }
-  if (compactCode.includes("gosubscriptionmonthlylimitexceeded")) {
-    return "monthly OpenCode Go usage limit reached";
-  }
   if (code.includes("subscriptionquota") || code.includes("quota")) {
-    return "OpenCode quota exceeded";
+    return "ModelScope request quota exceeded";
   }
-  return status === 429 ? "rate limit exceeded" : "OpenCode usage limit reached";
+  return status === 429 ? "rate limit exceeded" : "request limit reached";
 }
 
 function isRateLimitResponse(status: number, apiError: ParsedApiError): boolean {

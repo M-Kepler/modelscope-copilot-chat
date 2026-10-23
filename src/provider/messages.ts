@@ -105,8 +105,8 @@ export async function convertMessage(
       // (list-type) content on role:"tool" messages while accepting the same
       // parts in user/assistant messages. requiresStringToolContent() maps a
       // model to its handling mode:
-      //   "drop"  — MiMo: upstream cannot see tool images at all (issue #38,
-      //             upstream anomalyco/opencode#32613); flatten to a string
+      //   "drop"  — MiMo: upstream cannot see tool images at all (issue #38);
+      //             flatten to a string
       //             and replace each image with a placeholder note.
       //   "defer" — glm-5.3* (issue #233): tool-message image_url parts are
       //             rejected with HTTP 422 "[invalid_request_error] Input
@@ -369,7 +369,7 @@ export function normalizeMessages(messages: ApiMessage[]): ApiMessage[] {
  * the conversation. This bounds the cumulative payload weight when MCP
  * screenshot loops (chrome-devtools-mcp, playwright-mcp) accumulate base64
  * data URIs in history and trigger upstream `400 Upstream request failed`
- * rejections from OpenCode Go.
+ * rejections from the upstream provider.
  *
  * CONTRACT:
  *   - Iterates messages from newest to oldest, counting `image_url` parts.

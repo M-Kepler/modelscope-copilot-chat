@@ -1,4 +1,4 @@
-**Status:** 🟢 Active
+**Status:** ⚠️ Deprecated
 
 # Usage Dashboard — Real Data, Realtime, Full-Page Panel
 
@@ -13,7 +13,13 @@
 
 ## Overview
 
-The usage feature is a real-time Go subscription monitor split across the **status bar**, a **hover tooltip**, a **quick-pick**, and a **full-page webview dashboard**. Since PR #138 it reads **real data** (official server meters + OpenCode CLI history + extension-tracked requests), refreshes on a **background cadence**, formats everything in **compact K/M/B/T** units, and renders an interactive dashboard with ring meters and line charts.
+This document is retained as historical reference for the former OpenCode Go
+usage dashboard. The dashboard and related Go usage features were removed when
+the extension became ModelScope-only; they are not part of the current
+extension. The current ModelScope status indicators are documented in the
+[ModelScope extension design](../superpowers/specs/2026-10-22-modelscope-extension-design.md).
+
+The former usage feature was a real-time Go subscription monitor split across the **status bar**, a **hover tooltip**, a **quick-pick**, and a **full-page webview dashboard**. Since PR #138 it read **real data** (official server meters + OpenCode CLI history + extension-tracked requests), refreshed on a **background cadence**, formatted everything in **compact K/M/B/T** units, and rendered an interactive dashboard with ring meters and line charts.
 
 This doc is the living reference for the feature as of #138. The early design history (pre-#138 panel) lives in the superseded doc `05-...`.
 

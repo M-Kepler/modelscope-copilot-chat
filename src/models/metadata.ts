@@ -1,4 +1,11 @@
-import { GO_VENDOR, ZEN_VENDOR, type ProviderVendor, type AllProviderVendor } from "../providerTypes";
+import {
+  GO_VENDOR,
+  MODELSCOPE_CN_VENDOR,
+  MODELSCOPE_GLOBAL_VENDOR,
+  ZEN_VENDOR,
+  type MetadataVendor,
+  type AllProviderVendor,
+} from "../providerTypes";
 import { MODEL_LIMITS_BY_PROVIDER, MODELS_WITHOUT_TEMPERATURE, VISION_CAPABLE_MODELS } from "./modelTables";
 
 export interface BaseModelLimits {
@@ -56,7 +63,7 @@ export interface ModelMetadataFields {
 export interface CachedModelMetadataSnapshot {
   fetchedAt: number;
   /** Vendors may be absent in cached data loaded from disk. */
-  providers: Record<ProviderVendor, Record<string, ModelMetadataFields> | undefined>;
+  providers: Partial<Record<MetadataVendor, Record<string, ModelMetadataFields> | undefined>>;
 }
 
 export interface ResolvedModelMetadata extends BaseModelLimits {
@@ -138,12 +145,13 @@ interface ModelsDevProviderRecord {
 export interface ModelsDevResponse {
   opencode?: ModelsDevProviderRecord;
   "opencode-go"?: ModelsDevProviderRecord;
+  modelscopecn?: ModelsDevProviderRecord;
+  modelscopeglobal?: ModelsDevProviderRecord;
 }
 
 import {
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_OUTPUT_TOKENS,
-  FREE_ZEN_MODEL_IDS,
   MODEL_METADATA_CACHE_TTL_MS,
   MODEL_METADATA_REVISION,
 } from "../config";
@@ -156,13 +164,15 @@ const DEFAULT_MODEL_LIMITS: BaseModelLimits = {
   maxOutputTokens: DEFAULT_MODEL_MAX_OUTPUT_TOKENS,
 };
 
-const MODELS_DEV_PROVIDER_BY_VENDOR: Record<ProviderVendor, keyof ModelsDevResponse> = {
+const MODELS_DEV_PROVIDER_BY_VENDOR: Record<MetadataVendor, keyof ModelsDevResponse> = {
   [GO_VENDOR]: "opencode-go",
   [ZEN_VENDOR]: "opencode",
+  [MODELSCOPE_CN_VENDOR]: "modelscopecn",
+  [MODELSCOPE_GLOBAL_VENDOR]: "modelscopeglobal",
 };
 
 export function isFreeModel(modelId: string): boolean {
-  return FREE_ZEN_MODEL_IDS.has(modelId) || modelId.endsWith("-free");
+  return modelId.endsWith("-free");
 }
 
 // Static per-model data tables live in `modelTables.ts`; re-exported here so
@@ -183,11 +193,13 @@ export function bundledModelMetadataSnapshot(): CachedModelMetadataSnapshot {
     providers: {
       [GO_VENDOR]: bundledModelMetadataForProvider(GO_VENDOR),
       [ZEN_VENDOR]: bundledModelMetadataForProvider(ZEN_VENDOR),
+      [MODELSCOPE_CN_VENDOR]: {},
+      [MODELSCOPE_GLOBAL_VENDOR]: {},
     },
   };
 }
 
-export function fallbackModelMetadata(modelId: string, vendor: ProviderVendor): ModelMetadataFields | undefined {
+export function fallbackModelMetadata(modelId: string, vendor: MetadataVendor): ModelMetadataFields | undefined {
   const limits = MODEL_LIMITS_BY_PROVIDER[vendor][modelId];
   const supportsVision = VISION_CAPABLE_MODELS.has(modelId);
   const status = vendor === ZEN_VENDOR && modelId === "minimax-m2.5-free" ? "deprecated" : undefined;
@@ -215,6 +227,8 @@ export function normalizeModelsDevSnapshot(data: ModelsDevResponse): CachedModel
     providers: {
       [GO_VENDOR]: normalizeModelsDevProvider(data[MODELS_DEV_PROVIDER_BY_VENDOR[GO_VENDOR]]?.models ?? {}),
       [ZEN_VENDOR]: normalizeModelsDevProvider(data[MODELS_DEV_PROVIDER_BY_VENDOR[ZEN_VENDOR]]?.models ?? {}),
+      [MODELSCOPE_CN_VENDOR]: normalizeModelsDevProvider(data[MODELS_DEV_PROVIDER_BY_VENDOR[MODELSCOPE_CN_VENDOR]]?.models ?? {}),
+      [MODELSCOPE_GLOBAL_VENDOR]: normalizeModelsDevProvider(data[MODELS_DEV_PROVIDER_BY_VENDOR[MODELSCOPE_GLOBAL_VENDOR]]?.models ?? {}),
     },
   };
 }
@@ -236,7 +250,7 @@ export function normalizeLiveModelMetadata(model: ModelListEntry): ModelMetadata
 
 export function resolveModelMetadata(
   modelId: string,
-  vendor: ProviderVendor,
+  vendor: MetadataVendor,
   snapshot: CachedModelMetadataSnapshot,
   liveModelMetadataById: Map<string, ModelMetadataFields>,
 ): ResolvedModelMetadata {
@@ -268,11 +282,11 @@ export function resolveModelMetadata(
   };
 }
 
-export function hasExplicitModelLimits(modelId: string, vendor: ProviderVendor): boolean {
+export function hasExplicitModelLimits(modelId: string, vendor: MetadataVendor): boolean {
   return Boolean(fallbackModelMetadata(modelId, vendor));
 }
 
-function bundledModelMetadataForProvider(vendor: ProviderVendor): Record<string, ModelMetadataFields> {
+function bundledModelMetadataForProvider(vendor: MetadataVendor): Record<string, ModelMetadataFields> {
   return Object.fromEntries(
     Object.keys(MODEL_LIMITS_BY_PROVIDER[vendor]).flatMap((modelId) => {
       const metadata = fallbackModelMetadata(modelId, vendor);

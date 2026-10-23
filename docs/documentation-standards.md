@@ -1,4 +1,4 @@
-# 📋 OpenCode Copilot Chat — Documentation Standards
+# ModelScope Copilot Chat — Documentation Standards
 
 **Version:** 3.0 | **Updated:** 2026-06-12
 
@@ -17,7 +17,7 @@
 ### Codebase Verification
 
 ```bash
-# REQUIRED before deprecating — check if a pattern is still used
+# REQUIRED before deprecating — check whether a pattern is still used
 grep -r "ClassName" src/
 ```
 
@@ -86,8 +86,7 @@ grep -r "ClassName" src/
 
 **NEVER** include in documentation:
 
-- Passwords, API keys, tokens
-- OpenCode API keys, GitHub tokens, or secrets
+- Passwords, API keys, tokens, or GitHub credentials
 - Connection strings with credentials
 - VS Code `globalState` contents with real data
 
@@ -95,13 +94,13 @@ grep -r "ClassName" src/
 
 ```bash
 # Environment variable
-OPENCODE_API_KEY=<YOUR_API_KEY>
+MODELSCOPE_API_KEY=<YOUR_API_KEY>
 
 # Placeholder
-OPENCODE_GO_API_KEY=sk-xxxxxxxxxxxx
+MODELSCOPE_API_KEY=<YOUR_API_KEY>
 
 # Reference to settings
-Configure via VS Code Settings > Extensions > OpenCode Copilot Chat
+Configure via VS Code Language Models > ModelScope provider management
 ```
 
 ### If Secrets Are Accidentally Committed

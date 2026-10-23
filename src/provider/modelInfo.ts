@@ -1,18 +1,12 @@
 import * as vscode from "vscode";
-import {
-  CAPACITY_LIMITED_MODEL_NOTES,
-  CONFIG_SECTION,
-  MODEL_METADATA_REVISION,
-  SETTING_SHOW_PROVIDER_PREFIX,
-  secretKeyFor,
-} from "../config";
+import { CONFIG_SECTION, MODEL_METADATA_REVISION, SETTING_SHOW_PROVIDER_PREFIX, secretKeyFor } from "../config";
 import { resolveModelRouting } from "../core/routing";
 import { lookupModelRegistryEntry } from "../core/registry";
 import { isFreeModel, toEffectiveModelId, type CachedModelMetadataSnapshot, type ResolvedModelMetadata } from "../models/metadata";
 import { providerModelDisplayName } from "../models/modelNames";
 import { modelPricingFields } from "../models/pricing";
-import { GO_VENDOR, ZEN_VENDOR, type ProviderVendor } from "../providerTypes";
-import type { ConfiguredLanguageModelInfoOptions, OpenCodeModel, ProviderDefinition } from "./definitions";
+import { MODELSCOPE_CN_VENDOR, type ModelScopeBaseVendor } from "../providerTypes";
+import type { ConfiguredLanguageModelInfoOptions, ModelScopeModel, ProviderDefinition } from "./definitions";
 import {
   formatModalityBadges,
   getConfiguredApiKey,
@@ -21,7 +15,6 @@ import {
   modelConfigurationSchema,
   modelLimits,
 } from "./settings";
-import { ensureProfileSync } from "../usage/dashboard";
 
 // ISSUE #222: VS Code calls provideLanguageModelChatInformation on every UI
 // poll. Log the "Models registered" summary only when it actually changes
@@ -31,12 +24,12 @@ const LAST_REGISTRATION_LOG_SIGNATURE = new Map<string, string>();
 
 /**
  * Body of `provideLanguageModelChatInformation`: BYOK/secret key resolution,
- * profile registration and per-model `OpenCodeModel` assembly. Pure with
+ * model registration and per-model ModelScope model assembly. Pure with
  * respect to the provider class — all state arrives via {@link ModelInfoDeps}.
  */
 export interface ModelInfoDeps {
   context: vscode.ExtensionContext;
-  baseVendor: ProviderVendor;
+  baseVendor: ModelScopeBaseVendor;
   definition: ProviderDefinition;
   log(message: string): void;
   hasByokGroupConfigured(): boolean;
@@ -51,7 +44,7 @@ export async function provideModelChatInformation(
   deps: ModelInfoDeps,
   options: vscode.PrepareLanguageModelChatModelOptions,
   token: vscode.CancellationToken,
-): Promise<OpenCodeModel[]> {
+): Promise<ModelScopeModel[]> {
   const opts = options as ConfiguredLanguageModelInfoOptions & { group?: string };
 
   // 1. Try BYOK configuration first (VS Code may supply the API key directly).
@@ -92,7 +85,7 @@ export async function provideModelChatInformation(
   //    is absent (see microsoft/vscode `extensions/copilot/src/extension/byok/
   //    vscode-node/abstractLanguageModelChatProvider.ts`).
   //
-  //    See issue #86: non-agent `opencodezen` returned 0 models when the key
+  //    See issue #86: non-agent providers returned 0 models when the key
   //    was set via the extension command, because the previous guard
   //    `isAgentVariant || options.configuration` skipped the fallback for
   //    non-agent providers with `configuration=undefined`.
@@ -130,13 +123,6 @@ export async function provideModelChatInformation(
     return [];
   }
 
-  // Create profile for this API key before fetching models, so the
-  // profile is always registered in both the in-memory cache and
-  // globalState, regardless of whether a request has been recorded.
-  if (deps.baseVendor === GO_VENDOR) {
-    ensureProfileSync(apiKey);
-  }
-
   const models = await deps.fetchModels(apiKey, token);
   if (models.length === 0) {
     return [];
@@ -171,13 +157,12 @@ export async function provideModelChatInformation(
     deps.apiKeysByModelId.set(effectiveModelId, apiKey);
     deps.apiKeysByModelId.set(agentHostModelId, apiKey);
 
-    const capacityNote = CAPACITY_LIMITED_MODEL_NOTES[modelId];
     const modalityBadges = formatModalityBadges(metadata);
-    const baseDetail = deps.baseVendor === ZEN_VENDOR && isFreeModel(modelId) ? "Free" : deps.definition.displayName;
+    const baseDetail = deps.baseVendor === MODELSCOPE_CN_VENDOR && isFreeModel(modelId) ? "Free" : deps.definition.displayName;
     const baseTooltip = `${deps.definition.displayName} model: ${modelId}`;
     const configurationSchema = modelConfigurationSchema(modelId, metadata);
 
-    const sharedFields: Omit<OpenCodeModel, "id" | "targetChatSessionType"> = {
+    const sharedFields: Omit<ModelScopeModel, "id" | "targetChatSessionType"> = {
       rawModelId: modelId,
       name: providerModelDisplayName(deps.definition.modelNamePrefix, modelId, showProviderPrefix),
       // A stable real family name (e.g. "deepseek", "gpt") so VS Code's
@@ -187,8 +172,8 @@ export async function provideModelChatInformation(
       // Include effective limits in version so VS Code invalidates stale
       // picker metadata after limit changes (eg. 2M -> 262K corrections).
       version: `1.2.0-${MODEL_METADATA_REVISION}-${String(limits.contextWindow)}-${String(limits.maxOutputTokens)}`,
-      detail: capacityNote ? `${baseDetail} • Limited capacity` : modalityBadges ? `${baseDetail} • ${modalityBadges}` : baseDetail,
-      tooltip: capacityNote ? `${baseTooltip}\n\n${capacityNote}` : modalityBadges ? `${baseTooltip}\n\n${modalityBadges}` : baseTooltip,
+      detail: modalityBadges ? `${baseDetail} • ${modalityBadges}` : baseDetail,
+      tooltip: modalityBadges ? `${baseTooltip}\n\n${modalityBadges}` : baseTooltip,
       isUserSelectable: true,
       isBYOK: true,
       maxInputTokens: limits.advertisedMaxInputTokens,
@@ -196,9 +181,8 @@ export async function provideModelChatInformation(
       capabilities: modelCapabilities(metadata),
       endpointKind: routing.endpointKind,
       provider: deps.definition,
-      ...(capacityNote ? { warningText: { capacity: capacityNote } } : {}),
       // Pricing fields (VS Code languageModelPricing proposal)
-      ...modelPricingFields(modelId, deps.baseVendor, metadata),
+      ...modelPricingFields(modelId, deps.definition.vendor, metadata),
       // Inline so Copilot Chat picks up the Thinking submenu directly
       // (parity with zelosleone/Opencode-Go-For-Copilot pattern).
       ...(configurationSchema ? { configurationSchema } : {}),
@@ -209,7 +193,7 @@ export async function provideModelChatInformation(
       // targetChatSessionType must match the `type` declared in the
       // Copilot extension's chatSessions contribution:
       //   { "type": "copilotcli", "requiresCustomModels": true, ... }
-      const agentHostInfo: OpenCodeModel = {
+      const agentHostInfo: ModelScopeModel = {
         ...sharedFields,
         id: agentHostModelId,
         targetChatSessionType: "copilotcli",
@@ -222,7 +206,7 @@ export async function provideModelChatInformation(
     }
 
     // General variant — no targetChatSessionType → visible in Chat view
-    const info: OpenCodeModel = { ...sharedFields, id: effectiveModelId };
+    const info: ModelScopeModel = { ...sharedFields, id: effectiveModelId };
 
     registeredCount += 1;
     if (!firstModelId) firstModelId = info.id;

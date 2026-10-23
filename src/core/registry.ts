@@ -152,11 +152,12 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
  *               them). The router always passes the resolved base vendor.
  */
 export function lookupModelRegistryEntry(modelId: string, vendor?: ProviderVendor): ModelRegistryEntry {
+  const unprefixedModelId = modelId.slice(modelId.lastIndexOf("/") + 1);
   for (const entry of MODEL_REGISTRY) {
     if (vendor !== undefined && entry.vendors !== undefined && !entry.vendors.includes(vendor)) {
       continue;
     }
-    if (entry.patterns.some((pattern) => pattern.test(modelId))) {
+    if (entry.patterns.some((pattern) => pattern.test(unprefixedModelId))) {
       return entry;
     }
   }

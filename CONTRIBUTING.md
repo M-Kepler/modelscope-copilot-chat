@@ -9,14 +9,14 @@
 | Level           | What                       | How                                                                                                                  |
 | --------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | ⭐ **Easiest**  | Star the repo              | Click ⭐ top-right                                                                                                   |
-| 🐛 **Easy**     | Report a bug               | [Open an issue](https://github.com/ltmoerdani/opencode-copilot-chat/issues/new?template=bug_report.md)               |
-| 💡 **Easy**     | Suggest a feature or model | [Open a discussion](https://github.com/ltmoerdani/opencode-copilot-chat/discussions)                                 |
+| 🐛 **Easy**     | Report a bug               | [Open an issue](https://github.com/M-Kepler/modelscope-copilot-chat/issues/new)                                      |
+| 💡 **Easy**     | Suggest a feature or model | [Open a discussion](https://github.com/M-Kepler/modelscope-copilot-chat/discussions)                                 |
 | 📸 **Easy**     | Add a screenshot or GIF    | Drop in `docs/screenshots/`, open PR                                                                                 |
 | 📝 **Medium**   | Fix a typo / improve docs  | Edit README or `docs/`, open PR                                                                                      |
-| 🔧 **Medium**   | Fix a bug                  | Look for [`good first issue`](https://github.com/ltmoerdani/opencode-copilot-chat/labels/good%20first%20issue) label |
-| 🚀 **Advanced** | Add a new model or feature | [Start a discussion](https://github.com/ltmoerdani/opencode-copilot-chat/discussions) first, then PR                 |
+| 🔧 **Medium**   | Fix a bug                  | Look for [`good first issue`](https://github.com/M-Kepler/modelscope-copilot-chat/labels/good%20first%20issue) label |
+| 🚀 **Advanced** | Add a new model or feature | [Start a discussion](https://github.com/M-Kepler/modelscope-copilot-chat/discussions) first, then PR                 |
 
-> **New to open source?** Start with [`good first issue`](https://github.com/ltmoerdani/opencode-copilot-chat/labels/good%20first%20issue) — those are picked specifically for newcomers.
+> **New to open source?** Start with [`good first issue`](https://github.com/M-Kepler/modelscope-copilot-chat/labels/good%20first%20issue) — those are picked specifically for newcomers.
 
 ---
 
@@ -24,8 +24,8 @@
 
 ```bash
 # 1. Fork & clone
-git clone https://github.com/YOUR-USERNAME/opencode-copilot-chat.git
-cd opencode-copilot-chat
+git clone https://github.com/M-Kepler/modelscope-copilot-chat.git
+cd modelscope-copilot-chat
 
 # 2. Install
 npm install
@@ -58,21 +58,6 @@ That's it! You can now test your changes in the Extension Development Host.
 
 Tests the runtime retry mechanism with a mock server. Proves that HTTP 400 → patch → retry → HTTP 200 works.
 
-### `npm run validate-models` — Live API validation (requires API key)
-
-Tests ALL thinking/reasoning parameter combinations for each model against the live OpenCode API. Reuses the extension's exact logic.
-
-```powershell
-$env:OPENCODE_API_KEY = "your-key"
-npm run validate-models
-
-# Test specific families
-npm run validate-models -- --families deepseek,kimi
-
-# Dry run (no API calls)
-npm run validate-models -- --dry-run
-```
-
 ---
 
 ## ⚠️ Automation Rules (AI Agents & Copilot)
@@ -99,7 +84,7 @@ These rules exist to prevent accidental pushes to production branches.
 
 ## 💬 Questions?
 
-[Start a discussion](https://github.com/ltmoerdani/opencode-copilot-chat/discussions) — no question is too small!
+[Start a discussion](https://github.com/M-Kepler/modelscope-copilot-chat/discussions) — no question is too small!
 
 ---
 

@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { reportProgressWithContextWindowRequest } from "../contextWindowHookBridge";
 import type { StreamRequestOptions } from "../core/transport";
 
 interface StreamOpenCodeResponseOptions extends StreamRequestOptions {
@@ -36,16 +35,11 @@ interface RequestUsageSummary {
 }
 
 function reportProgressPart(
-  localRequestId: string | undefined,
+  _localRequestId: string | undefined,
   progress: vscode.Progress<vscode.LanguageModelResponsePart2>,
   part: vscode.LanguageModelResponsePart2,
 ): void {
-  if (!localRequestId) {
-    progress.report(part);
-    return;
-  }
-
-  reportProgressWithContextWindowRequest(localRequestId, progress, part);
+  progress.report(part);
 }
 
 /**

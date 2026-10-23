@@ -1,15 +1,19 @@
-**Status:** ✅ Solved (server-accurate since PR #132)
+**Status:** ⚠️ Deprecated
 
 # Go Usage Tracker — Feature Implementation
 
 **Topic:** usage / features / status-bar / provider / tracking
 **Updated:** 2026-08-13
 **Tags:** #usage #features #status-bar #go-usage #pricing #byok #sqlite #server-sync
-**Supersedes:** —
+**Superseded by:** [ModelScope extension design](../superpowers/specs/2026-10-22-modelscope-extension-design.md)
 
 ---
 
 ## Overview
+
+This document is retained as historical reference for the former OpenCode Go
+product. The Go usage tracker was removed when this extension became
+ModelScope-only; it is not part of the current extension.
 
 Implemented a real-time Go subscription usage tracker that displays 5-hour rolling, weekly, and monthly limit percentages in the VS Code status bar. The feature was triggered by a GitHub user request to display daily, weekly, and monthly limits as percentages.
 

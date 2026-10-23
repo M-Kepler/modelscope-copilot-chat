@@ -3,12 +3,20 @@ import assert from "node:assert/strict";
 import {
   fallbackModelMetadata,
   getContextSizeOptionsForModel,
+  isFreeModel,
   normalizeLiveModelMetadata,
   resolveModelMetadata,
   VISION_CAPABLE_MODELS,
   type CachedModelMetadataSnapshot,
 } from "../models/metadata.js";
 import { GO_VENDOR, ZEN_VENDOR } from "../providerTypes.js";
+
+describe("isFreeModel — ModelScope model ids", () => {
+  it("recognizes free-tier suffixes without OpenCode-specific model ids", () => {
+    assert.equal(isFreeModel("model-free"), true);
+    assert.equal(isFreeModel("big-pickle"), false);
+  });
+});
 
 /**
  * Unit tests for the kimi-k2.7-code fallback metadata fix (issue #25).

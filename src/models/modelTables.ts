@@ -1,4 +1,4 @@
-import { GO_VENDOR, ZEN_VENDOR, type ProviderVendor } from "../providerTypes";
+import { GO_VENDOR, MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR, ZEN_VENDOR, type MetadataVendor } from "../providerTypes";
 import type { BaseModelLimits } from "./metadata";
 
 /**
@@ -8,7 +8,7 @@ import type { BaseModelLimits } from "./metadata";
  */
 
 /** Bundled context/output limits per vendor+model (models.dev snapshot). */
-export const MODEL_LIMITS_BY_PROVIDER: Record<ProviderVendor, Record<string, BaseModelLimits | undefined>> = {
+export const MODEL_LIMITS_BY_PROVIDER: Record<MetadataVendor, Record<string, BaseModelLimits | undefined>> = {
   [GO_VENDOR]: {
     // OpenCode Go caps completion at 131072 even though models.dev still lists
     // output: 384000 — the gateway rejects larger values with HTTP 400 (#171).
@@ -94,6 +94,8 @@ export const MODEL_LIMITS_BY_PROVIDER: Record<ProviderVendor, Record<string, Bas
     "big-pickle": { contextWindow: 200000, maxOutputTokens: 128000 },
     "muse-spark-1.2-contributor-free": { contextWindow: 1048576, maxOutputTokens: 131072 },
   },
+  [MODELSCOPE_CN_VENDOR]: {},
+  [MODELSCOPE_GLOBAL_VENDOR]: {},
 };
 
 /**

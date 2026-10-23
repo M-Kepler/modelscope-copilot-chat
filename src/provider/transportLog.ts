@@ -2,7 +2,6 @@ import type * as vscode from "vscode";
 import type { TransportRequestSummary } from "../core/transport";
 import { RECENT_TRANSPORT_SUMMARY_LIMIT, RECENT_TRANSPORT_SUMMARY_STORAGE_PREFIX } from "../config";
 import { stringifyInitiator } from "../request/headers";
-import { formatCacheHitRatio } from "../usage/usage";
 
 /**
  * Rolling log of recent transport request summaries per provider vendor,
@@ -73,10 +72,10 @@ function storageKeyFor(vendor: string): string {
 
 function formatTransportSummaryBlock(summary: RecentTransportSummary, index: number): string[] {
   const status = summary.status ?? summary.abortedReason ?? "n/a";
-  const cacheHitRatio = formatCacheHitRatio({
-    promptTokens: summary.promptTokens,
-    cachedTokens: summary.cachedTokens,
-  });
+  const cacheHitRatio =
+    summary.promptTokens !== undefined && summary.promptTokens > 0 && summary.cachedTokens !== undefined
+      ? `${((summary.cachedTokens / summary.promptTokens) * 100).toFixed(1)}%`
+      : undefined;
   const lines = [
     `### ${String(index + 1)}. ${summary.modelId}`,
     "",

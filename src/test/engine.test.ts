@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { installVscodeMock } from "./helpers/goUsageTestUtils.js";
+import { installVscodeMock } from "./helpers/vscodeMock.js";
 
 // engine → streamParts/chatParts/contextWindowHookBridge import "vscode" at
 // runtime; install the stub before the dynamic import below resolves them.

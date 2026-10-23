@@ -1,9 +1,9 @@
 import type * as vscode from "vscode";
 import {
-  buildOpenCodeRequestError,
+  buildModelScopeRequestError,
   formatDuration,
   formatRateLimitSummary,
-  OpenCodeRequestError,
+  ModelScopeRequestError,
   readRateLimitInfo,
   truncateForLog,
 } from "../errors";
@@ -21,13 +21,6 @@ import {
   TRANSIENT_FETCH_RETRY_JITTER_MS,
   RATE_LIMIT_MAX_RETRY_AFTER_WAIT_MS,
 } from "../config";
-import { createUsageDataParts } from "../chatParts";
-import {
-  clearContextWindowRequest,
-  reportUsageToContextWindowForRequest,
-  setContextWindowOutputBufferForRequest,
-} from "../contextWindowHookBridge";
-import { formatUsageLogLine } from "../usage/usage";
 import { getErrorMessage, parseRetryAfterMs, sleepWithCancellation } from "../utils";
 import { parseServerSentEvent, isStreamTruncated } from "./sse";
 import { reportProgressPart, type RequestUsageSummary, type StreamOpenCodeResponseOptions } from "./streamParts";
@@ -87,6 +80,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
   let responseStatus: number | undefined;
   let responseContentType: string | undefined;
   let emittedSummary = false;
+  let responseQuotaSummary: Partial<TransportRequestSummary> = {};
   const abort = (reason: typeof abortReason) => {
     abortReason ??= reason;
     controller.abort();
@@ -130,58 +124,29 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
       ...(usageSummary.totalTokens === undefined ? {} : { totalTokens: usageSummary.totalTokens }),
       ...(usageSummary.cachedTokens === undefined ? {} : { cachedTokens: usageSummary.cachedTokens }),
       ...(usageSummary.finishReason === undefined ? {} : { finishReason: usageSummary.finishReason }),
+      ...responseQuotaSummary,
       ...extra,
     };
 
-    // Let the caller enrich the summary (e.g. add copilotCredits) before
-    // we create the usage data parts, so VS Code session cost works.
     options.onTransportSummary?.(summary);
 
     options.output?.appendLine(
       `[response-summary] status=${String(summary.status ?? "n/a")} durationMs=${String(summary.durationMs)} ttfbMs=${String(summary.ttfbMs ?? "n/a")} promptTokens=${String(summary.promptTokens ?? "n/a")} completionTokens=${String(summary.completionTokens ?? "n/a")} totalTokens=${String(summary.totalTokens ?? "n/a")} cachedTokens=${String(summary.cachedTokens ?? "n/a")} finishReason=${summary.finishReason ?? "<unknown>"} totalBytes=${String(summary.totalBytes)} totalEvents=${String(summary.totalEvents)}`,
     );
-    const usageLog = formatUsageLogLine({
-      promptTokens: summary.promptTokens,
-      completionTokens: summary.completionTokens,
-      totalTokens: summary.totalTokens,
-      cachedTokens: summary.cachedTokens,
-      finishReason: summary.finishReason,
-    });
+    const usageLog = [
+      summary.promptTokens === undefined ? undefined : `prompt=${String(summary.promptTokens)}`,
+      summary.completionTokens === undefined ? undefined : `completion=${String(summary.completionTokens)}`,
+      summary.totalTokens === undefined ? undefined : `total=${String(summary.totalTokens)}`,
+      summary.cachedTokens === undefined ? undefined : `cached=${String(summary.cachedTokens)}`,
+    ]
+      .filter((value): value is string => value !== undefined)
+      .join(" ");
     if (usageLog) {
       options.output?.appendLine(`[usage] ${usageLog}`);
-    }
-
-    if (localRequestId) {
-      reportUsageToContextWindowForRequest(localRequestId, {
-        promptTokens: summary.promptTokens,
-        completionTokens: summary.completionTokens,
-        totalTokens: summary.totalTokens,
-        cachedTokens: summary.cachedTokens,
-        finishReason: summary.finishReason,
-      });
-    }
-
-    const usageParts =
-      summary.errorMessage || summary.abortedReason
-        ? []
-        : createUsageDataParts({
-            promptTokens: summary.promptTokens,
-            completionTokens: summary.completionTokens,
-            totalTokens: summary.totalTokens,
-            cachedTokens: summary.cachedTokens,
-            finishReason: summary.finishReason,
-            copilotCredits: summary.copilotCredits,
-          });
-    for (const usagePart of usageParts) {
-      reportProgressPart(localRequestId, options.progress, usagePart);
     }
   };
 
   try {
-    if (localRequestId && options.contextWindowOutputBuffer !== undefined) {
-      setContextWindowOutputBufferForRequest(localRequestId, options.contextWindowOutputBuffer);
-    }
-
     let rawPayload = JSON.stringify(options.body);
 
     // Log request for debugging latency.
@@ -247,7 +212,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
       // All attempts failed with transient network errors — surface a clear,
       // actionable error instead of the raw undici "fetch failed" wrapper.
       const networkError = lastError instanceof Error ? lastError : new Error(getErrorMessage(lastError));
-      const requestError = new OpenCodeRequestError(
+      const requestError = new ModelScopeRequestError(
         `${options.providerDisplayName} request failed (network error after ${String(TRANSIENT_FETCH_MAX_RETRIES + 1)} attempts): ${getErrorMessage(networkError)}`,
         `${options.providerDisplayName} couldn't reach the gateway (network error). Check your connection, VPN, or firewall, then try again.`,
       );
@@ -355,7 +320,14 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
     responseStatus = response.status;
     responseContentType = response.headers.get("content-type") ?? "";
     options.output?.appendLine(`[http] ${String(response.status)} ${response.statusText} content-type=${responseContentType || "<none>"}`);
-    const rateLimitSummary = formatRateLimitSummary(readRateLimitInfo(response.headers));
+    const rateLimitInfo = readRateLimitInfo(response.headers);
+    const rateLimitSummary = formatRateLimitSummary(rateLimitInfo);
+    responseQuotaSummary = {
+      userRequestLimit: rateLimitInfo.userRequestLimit,
+      userRequestRemaining: rateLimitInfo.userRequestRemaining,
+      modelRequestLimit: rateLimitInfo.modelRequestLimit,
+      modelRequestRemaining: rateLimitInfo.modelRequestRemaining,
+    };
     if (rateLimitSummary) {
       options.output?.appendLine(`[rate-limit] ${rateLimitSummary}`);
     }
@@ -365,18 +337,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
       // otherwise read from the response stream.
       const detail = consumedErrorBody ?? (await response.text());
       options.output?.appendLine(`[http-error-body] ${detail.trim() ? truncateForLog(detail) : "<empty>"}`);
-      const capacityHint =
-        options.capacityLimitedModelNotes?.[options.modelId] && response.status >= 500
-          ? ` — ${options.capacityLimitedModelNotes[options.modelId]}`
-          : "";
-      const requestError = buildOpenCodeRequestError(
-        options.providerDisplayName,
-        response,
-        detail,
-        options.modelId,
-        payload.length,
-        capacityHint,
-      );
+      const requestError = buildModelScopeRequestError(options.providerDisplayName, response, detail, options.modelId, payload.length);
       emitSummary(new TextEncoder().encode(detail).byteLength, 0, {
         errorMessage: requestError.message,
         rateLimitSummary,
@@ -578,7 +539,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
       // gateway billed completion tokens — give the reporter a targeted
       // message that names the likely cause and the diagnostic path.
       if (extractedPartCount === 0 && usageSummary.completionTokens && usageSummary.completionTokens > 0) {
-        const zeroPartError = new OpenCodeRequestError(
+        const zeroPartError = new ModelScopeRequestError(
           `${options.providerDisplayName} consumed ${String(usageSummary.completionTokens)} completion tokens but returned no parsable content (${String(totalEvents)} events, ${String(totalBytes)} bytes${localRequestId ? `, request ${localRequestId}` : ""}).`,
           `${options.providerDisplayName} generated output in a format this extension could not parse. Enable "Debug Reasoning" for this provider, retry once (the upstream may recover), and if it repeats, attach the [diag-sse-event-*] lines from the OpenCode Output channel to a bug report.`,
         );
@@ -588,7 +549,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
         });
         throw zeroPartError;
       }
-      const requestError = new OpenCodeRequestError(
+      const requestError = new ModelScopeRequestError(
         `${options.providerDisplayName} response stream ended before completion (no [DONE] or finish_reason after ${String(totalBytes)} bytes / ${String(totalEvents)} events${localRequestId ? `, request ${localRequestId}` : ""}).`,
         `${options.providerDisplayName} stopped sending data before the response was complete (the connection closed unexpectedly). Your message may be cut off — try sending it again; a single resend usually succeeds. If this keeps happening, check your connection, VPN, or firewall.`,
       );
@@ -609,7 +570,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
       return;
     }
     if (abortReason === "request-timeout") {
-      const requestError = new OpenCodeRequestError(
+      const requestError = new ModelScopeRequestError(
         `${options.providerDisplayName} request timed out after ${formatDuration(options.requestTimeoutMs)}.`,
         `${options.providerDisplayName} did not start or finish the request within ${formatDuration(options.requestTimeoutMs)}. Try again later or reduce the request size.`,
       );
@@ -639,7 +600,7 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
         await streamOpenCodeResponse({ ...options, streamFailureRetryAttempt: nextAttempt });
         return;
       }
-      const requestError = new OpenCodeRequestError(
+      const requestError = new ModelScopeRequestError(
         `${options.providerDisplayName} stream stalled for ${formatDuration(options.streamIdleTimeoutMs)} without new data.`,
         `${options.providerDisplayName} stopped sending stream data for ${formatDuration(options.streamIdleTimeoutMs)}, so the request was cancelled to avoid leaving Copilot stuck. Try sending your message again; if you use a model with long silent reasoning pauses, raise the streamIdleTimeoutSeconds setting for this provider.`,
       );
@@ -666,7 +627,6 @@ export async function streamOpenCodeResponse(options: StreamOpenCodeResponseOpti
     controller.abort();
     cancellation.dispose();
     if (localRequestId) {
-      clearContextWindowRequest(localRequestId);
     }
   }
 }

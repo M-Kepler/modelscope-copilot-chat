@@ -22,15 +22,20 @@ import {
   SETTING_THINKING_QWEN,
   SETTING_THINKING_QWEN_BUDGET,
   THINKING_DEFAULTS,
-  VISION_PROXY_MODEL_ID_KEY,
 } from "../config";
 import { getContextSizeOptionsForModel, type CachedModelMetadataSnapshot, type ResolvedModelMetadata } from "../models/metadata";
 import { buildStableModelCapabilities } from "../models/modelCapabilities";
 import { calculateModelLimits, type ModelLimits } from "../models/modelLimits";
-import { AGENT_GO_VENDOR, AGENT_ZEN_VENDOR, GO_VENDOR, ZEN_VENDOR, resolveBaseVendor, type AllProviderVendor } from "../providerTypes";
+import {
+  AGENT_MODELSCOPE_CN_VENDOR,
+  AGENT_MODELSCOPE_GLOBAL_VENDOR,
+  MODELSCOPE_CN_VENDOR,
+  MODELSCOPE_GLOBAL_VENDOR,
+  resolveBaseVendor,
+  type ModelScopeProviderVendor,
+} from "../providerTypes";
 import type { ApiSettings } from "../request/types";
 import { thinkingProviderFor } from "../thinking";
-import { extensionContext } from "../usage/dashboard";
 import { toFiniteNumber } from "../utils";
 import type { LanguageModelConfiguration, ProviderDefinition } from "./definitions";
 
@@ -113,7 +118,7 @@ export function getRequestModelConfiguration(options: vscode.ProvideLanguageMode
  * Plain `config.get()` merges workspace + user scope, but the Agents window
  * runs this extension in a separate agent-host process that can resolve the
  * workspace root differently (or have none at all), which made user-scope
- * `opencodego.thinking.*` values fall back to the baked-in defaults ("off").
+ * `modelscope.thinking.*` values fall back to the baked-in defaults ("off").
  * Reading via `inspect()` prefers an explicitly set workspace value, then an
  * explicitly set user value, and only then the fallback — so a thinking
  * level set in User settings always wins over the default regardless of
@@ -229,15 +234,9 @@ export function modelLimits(
 }
 
 export function modelCapabilities(metadata: ResolvedModelMetadata): vscode.LanguageModelChatCapabilities {
-  // When a vision proxy model is configured (non-empty ID in globalState),
-  // report imageInput: true for ALL models so VS Code does not strip image
-  // parts before they reach our provider. The vision proxy interceptor
-  // forwards images to the configured model transparently.
-  const supportsVision = metadata.supportsVision || isVisionProxyEnabled();
-
   // `editTools` is intentionally absent. VS Code 1.132 still gates that hint
   // behind the chatProvider proposal for non-allowlisted extensions.
-  return buildStableModelCapabilities(supportsVision);
+  return buildStableModelCapabilities(metadata.supportsVision);
 }
 
 export function formatModalityBadges(metadata: ResolvedModelMetadata): string {
@@ -263,10 +262,8 @@ export function shouldHideDeprecatedModel(
   snapshot: CachedModelMetadataSnapshot,
   liveModelIds?: ReadonlySet<string>,
 ): boolean {
-  if (resolveBaseVendor(vendor) !== ZEN_VENDOR) {
-    return false;
-  }
-  if (snapshot.providers[ZEN_VENDOR]?.[modelId]?.status !== "deprecated") {
+  const baseVendor = resolveBaseVendor(vendor);
+  if (snapshot.providers[baseVendor]?.[modelId]?.status !== "deprecated") {
     return false;
   }
   // Gateway is the source of truth for availability (issue #182). Only hide
@@ -284,7 +281,12 @@ export function shouldHideDeprecatedModel(
 
 export function resolveRawModelId(modelId: string): string {
   const [base] = modelId.split("::");
-  const prefixes = [`${GO_VENDOR}:`, `${ZEN_VENDOR}:`, `${AGENT_GO_VENDOR}:`, `${AGENT_ZEN_VENDOR}:`];
+  const prefixes = [
+    `${MODELSCOPE_CN_VENDOR}:`,
+    `${MODELSCOPE_GLOBAL_VENDOR}:`,
+    `${AGENT_MODELSCOPE_CN_VENDOR}:`,
+    `${AGENT_MODELSCOPE_GLOBAL_VENDOR}:`,
+  ];
   for (const prefix of prefixes) {
     if (base.startsWith(prefix)) {
       return base.slice(prefix.length);
@@ -294,17 +296,10 @@ export function resolveRawModelId(modelId: string): string {
 }
 
 /** Best-effort vendor resolution from a model ID. */
-export function resolveVendorFromId(modelId: string): AllProviderVendor {
-  if (modelId.startsWith(`${AGENT_GO_VENDOR}:`)) return AGENT_GO_VENDOR;
-  if (modelId.startsWith(`${AGENT_ZEN_VENDOR}:`)) return AGENT_ZEN_VENDOR;
-  if (modelId.startsWith(`${ZEN_VENDOR}:`)) return ZEN_VENDOR;
-  return GO_VENDOR;
-}
-
-/**
- * True when a vision proxy model has been configured (non-empty model ID
- * stored in globalState via the "OpenCode Go: Configure Vision Proxy" command).
- */
-export function isVisionProxyEnabled(): boolean {
-  return extensionContext().globalState.get<string>(VISION_PROXY_MODEL_ID_KEY, "").length > 0;
+export function resolveVendorFromId(modelId: string): ModelScopeProviderVendor {
+  if (modelId.startsWith(`${AGENT_MODELSCOPE_CN_VENDOR}:`)) return AGENT_MODELSCOPE_CN_VENDOR;
+  if (modelId.startsWith(`${AGENT_MODELSCOPE_GLOBAL_VENDOR}:`)) return AGENT_MODELSCOPE_GLOBAL_VENDOR;
+  if (modelId.startsWith(`${MODELSCOPE_CN_VENDOR}:`)) return MODELSCOPE_CN_VENDOR;
+  if (modelId.startsWith(`${MODELSCOPE_GLOBAL_VENDOR}:`)) return MODELSCOPE_GLOBAL_VENDOR;
+  return MODELSCOPE_CN_VENDOR;
 }

@@ -1,5 +1,4 @@
 import { isFreeModel, type ResolvedModelMetadata } from "../models/metadata";
-import { GO_VENDOR } from "../providerTypes";
 import type { ProviderDefinition } from "../provider/definitions";
 
 /**
@@ -47,11 +46,7 @@ export function modelPricingFields(
     };
   }
 
-  // No models.dev cost data: fall back to a neutral label so the picker
-  // shows something instead of pretending we know the price.
-  return {
-    pricing: `${vendor === GO_VENDOR ? "Go" : "Zen"} subscription`,
-  };
+  return { pricing: "ModelScope API" };
 }
 
 /**

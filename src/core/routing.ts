@@ -1,4 +1,4 @@
-import { resolveBaseVendor, type ProviderRoutingDefinition } from "../providerTypes";
+import { MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR, resolveBaseVendor, type ProviderRoutingDefinition } from "../providerTypes";
 import { lookupModelRegistryEntry, type ModelEndpointKind } from "./registry";
 
 /**
@@ -19,6 +19,13 @@ export function resolveModelRouting(
 } {
   // Resolve agent-host variants to their base vendor for routing decisions.
   const baseVendor = resolveBaseVendor(provider.vendor);
+  if (baseVendor === MODELSCOPE_CN_VENDOR || baseVendor === MODELSCOPE_GLOBAL_VENDOR) {
+    return {
+      endpointKind: "chat-completions",
+      endpointUrl: provider.chatCompletionsUrl,
+      sdkPackage: "@ai-sdk/openai-compatible",
+    };
+  }
   const entry = lookupModelRegistryEntry(modelId, baseVendor);
 
   let endpointUrl: string;

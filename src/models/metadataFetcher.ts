@@ -8,12 +8,10 @@ import {
   type ModelsDevResponse,
 } from "./metadata";
 import { getErrorMessage } from "../utils";
-import { GO_VENDOR, ZEN_VENDOR } from "../providerTypes";
+import { MODELSCOPE_CN_VENDOR, MODELSCOPE_GLOBAL_VENDOR } from "../providerTypes";
 
 /**
- * In-memory models.dev metadata cache shared by the provider domain and the
- * usage dashboard (cost resolver). Owned here so the fetch orchestration and
- * the state never drift apart.
+ * In-memory models.dev metadata cache used by the ModelScope provider domain.
  */
 let modelMetadataSnapshot: CachedModelMetadataSnapshot | undefined;
 let modelMetadataRefreshPromise: Promise<CachedModelMetadataSnapshot> | undefined;
@@ -30,13 +28,13 @@ export function setModelMetadataRefreshPromise(promise: Promise<CachedModelMetad
   modelMetadataRefreshPromise = promise;
 }
 
-export async function clearOpenCodeModelMetadataCache(context: vscode.ExtensionContext): Promise<void> {
+export async function clearModelMetadataCache(context: vscode.ExtensionContext): Promise<void> {
   modelMetadataSnapshot = undefined;
   modelMetadataRefreshPromise = undefined;
   await context.globalState.update(MODEL_METADATA_CACHE_KEY, undefined);
 }
 
-export async function getOpenCodeModelMetadata(
+export async function getModelMetadata(
   context: vscode.ExtensionContext,
   output?: vscode.OutputChannel,
 ): Promise<CachedModelMetadataSnapshot> {
@@ -46,14 +44,14 @@ export async function getOpenCodeModelMetadata(
     if (isFreshModelMetadata(cached)) {
       return cached;
     }
-    void refreshOpenCodeModelMetadata(context, output);
+    void refreshModelMetadata(context, output);
     return cached;
   }
 
-  return refreshOpenCodeModelMetadata(context, output);
+  return refreshModelMetadata(context, output);
 }
 
-export async function refreshOpenCodeModelMetadata(
+export async function refreshModelMetadata(
   context: vscode.ExtensionContext,
   output?: vscode.OutputChannel,
 ): Promise<CachedModelMetadataSnapshot> {
@@ -75,7 +73,7 @@ export async function refreshOpenCodeModelMetadata(
     modelMetadataSnapshot = snapshot;
     await context.globalState.update(MODEL_METADATA_CACHE_KEY, snapshot);
     output?.appendLine(
-      `[metadata] refreshed models.dev cache go=${Object.keys(snapshot.providers[GO_VENDOR] ?? {}).length} zen=${Object.keys(snapshot.providers[ZEN_VENDOR] ?? {}).length}`,
+      `[metadata] refreshed models.dev cache China=${Object.keys(snapshot.providers[MODELSCOPE_CN_VENDOR] ?? {}).length} Global=${Object.keys(snapshot.providers[MODELSCOPE_GLOBAL_VENDOR] ?? {}).length}`,
     );
     return snapshot;
   })()

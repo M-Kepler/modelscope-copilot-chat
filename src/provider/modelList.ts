@@ -8,9 +8,10 @@ import {
 } from "../config";
 import { getErrorMessage } from "../utils";
 import { sleep } from "../utils";
-import { getUserAgent, isTransientFetchError, type ModelListEntry, type ModelListResponse, type ProviderDefinition } from "./definitions";
-import { auxiliarySessionId } from "../request/headers";
+import { isTransientFetchError, type ModelListEntry, type ModelListResponse, type ProviderDefinition } from "./definitions";
+import { buildModelScopeRequestHeaders } from "../request/headers";
 import { resolveBaseVendor } from "../providerTypes";
+import { buildModelScopeAuthHeaders } from "../modelScopeAuth";
 
 /**
  * Fetches the live `/models` list with retry/backoff and cancellation support,
@@ -53,15 +54,11 @@ export class ModelListFetcher {
     // lack these headers even when the host is allow-listed. Issue #78
     // reporter sits behind a VPN + corporate firewall on Windows 11.
     const headers: Record<string, string> = {
-      "User-Agent": getUserAgent(),
+      ...buildModelScopeRequestHeaders(),
       Accept: "application/json",
-      // Gateway enforcement: every OpenCode request needs a stable session id
-      // (docs/go, 2026-09-07). /models has no conversation — use the
-      // persisted per-installation id.
-      "x-opencode-session": auxiliarySessionId(this.deps.context),
     };
     if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
+      headers.Authorization = buildModelScopeAuthHeaders("models", apiKey).Authorization;
     }
 
     let lastError: unknown;

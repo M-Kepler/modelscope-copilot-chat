@@ -20,7 +20,6 @@ export interface StreamRequestOptions {
   contextWindowOutputBuffer?: number;
   authHeaders?: Record<string, string>;
   onReasoningContent?: (toolCallIds: string[], reasoningContent: string) => void;
-  capacityLimitedModelNotes?: Record<string, string>;
   onTransportSummary?: (summary: TransportRequestSummary) => void;
   /**
    * Whether `reasoning_content` should be surfaced as visible text instead of
@@ -78,6 +77,10 @@ export interface TransportRequestSummary {
   /** Credits for VS Code session cost (1 credit = $0.01). */
   copilotCredits?: number;
   rateLimitSummary?: string;
+  userRequestLimit?: string;
+  userRequestRemaining?: string;
+  modelRequestLimit?: string;
+  modelRequestRemaining?: string;
   abortedReason?: "request-timeout" | "stream-idle-timeout" | "cancelled" | "truncated-retry" | "stalled-retry";
   errorMessage?: string;
 }

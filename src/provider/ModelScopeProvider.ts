@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { OpenCodeRequestError } from "../errors";
+import { ModelScopeRequestError } from "../errors";
 import {
   hasExplicitModelLimits,
   normalizeLiveModelMetadata,
@@ -10,15 +10,15 @@ import {
 } from "../models/metadata";
 
 import { thinkingFamily, thinkingProviderFor } from "../thinking";
-import { buildOpenCodeGatewayAuthHeaders } from "../openCodeAuth";
+import { buildModelScopeAuthHeaders } from "../modelScopeAuth";
 import { streamAnthropicMessages as runStreamAnthropicMessages } from "../transports/anthropic";
 import { streamChatCompletions as runStreamChatCompletions } from "../transports/chatCompletions";
 import { streamGoogleGenerateContent as runStreamGoogleGenerateContent } from "../transports/google";
 import { streamResponsesApi as runStreamResponsesApi } from "../transports/responses";
 
-import { resolveBaseVendor, type ProviderVendor } from "../providerTypes";
+import { resolveBaseVendor, type ModelScopeBaseVendor } from "../providerTypes";
 
-import { ModelListEntry, OpenCodeModel, ProviderDefinition } from "./definitions";
+import { ModelListEntry, ModelScopeModel, ProviderDefinition } from "./definitions";
 import {
   buildAnthropicMessagesRequestBody,
   buildChatCompletionsRequestBody,
@@ -29,10 +29,9 @@ import { buildResponsesToolNameMap } from "../request/openai";
 
 import { runtimeDiagnosticsLines } from "../runtimeDiagnostics";
 import { estimateTokenCount } from "../tokenEstimate";
-import { CAPACITY_LIMITED_MODEL_NOTES, KNOWN_UNAVAILABLE_MODEL_IDS, secretKeyFor } from "../config";
-import {} from "../usage/dashboard";
+import { REASONING_CACHE_LIMIT, secretKeyFor } from "../config";
 
-import { clearOpenCodeModelMetadataCache, getOpenCodeModelMetadata } from "../models/metadataFetcher";
+import { clearModelMetadataCache, getModelMetadata } from "../models/metadataFetcher";
 
 import { estimateChatMessageTokenCount } from "./tokens";
 import { modelLimits, resolveRawModelId, shouldHideDeprecatedModel } from "./settings";
@@ -44,11 +43,12 @@ import { provideModelChatInformation, type ModelInfoDeps } from "./modelInfo";
 import { ModelListFetcher } from "./modelList";
 import { manageProvider, testConnection, type DialogDeps } from "./providerDialogs";
 import { TransportSummaryLog } from "./transportLog";
-export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCodeModel> {
+import type { TransportRequestSummary } from "../core/transport";
+export class ModelScopeProvider implements vscode.LanguageModelChatProvider<ModelScopeModel> {
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeLanguageModelChatInformation = this.changeEmitter.event;
 
-  /** Trigger a model information refresh (e.g. after visionModel setting changes). */
+  /** Trigger a model-information refresh. */
   notifyModelInfoChanged(): void {
     this.changeEmitter.fire();
   }
@@ -57,11 +57,11 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   /**
    * globalState key tracking whether this vendor has a configured BYOK group
    * (issue #106). Set when a configured-group call is served; read by the
-   * groupless call to decide whether to stay silent. Scoped per vendor so an
-   * `opencodego` group does not affect `opencodezen`.
+   * groupless call to decide whether to stay silent. Scoped per vendor so the
+   * China and Global configuration groups remain separate.
    */
   private get byokGroupStateKey(): string {
-    return `opencode.byokGroup.v1.${this.definition.vendor}`;
+    return `modelscope.byokGroup.v1.${this.definition.vendor}`;
   }
 
   private hasByokGroupConfigured(): boolean {
@@ -73,7 +73,6 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
   /** Capped to prevent unbounded growth across long sessions. */
   private readonly reasoningContentByToolCallId = new Map<string, string>();
-  private static readonly REASONING_CACHE_LIMIT = 500;
   private readonly liveModelMetadataById = new Map<string, ModelMetadataFields>();
   private outputChannel: vscode.OutputChannel | undefined;
 
@@ -83,7 +82,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
    * reloads and can cover transient network failures at startup (issue #78).
    */
   /** Resolves agent-host variants to their base vendor for metadata/routing. */
-  private get baseVendor(): ProviderVendor {
+  private get baseVendor(): ModelScopeBaseVendor {
     return resolveBaseVendor(this.definition.vendor);
   }
 
@@ -93,8 +92,8 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
       this.reasoningContentByToolCallId.set(toolCallId, reasoningContent);
     }
     // Evict oldest entries if the cache exceeds the limit.
-    if (this.reasoningContentByToolCallId.size > OpenCodeProvider.REASONING_CACHE_LIMIT) {
-      const excess = this.reasoningContentByToolCallId.size - OpenCodeProvider.REASONING_CACHE_LIMIT;
+    if (this.reasoningContentByToolCallId.size > REASONING_CACHE_LIMIT) {
+      const excess = this.reasoningContentByToolCallId.size - REASONING_CACHE_LIMIT;
       const keys = this.reasoningContentByToolCallId.keys();
       for (let i = 0; i < excess; i++) {
         const key = keys.next().value;
@@ -108,6 +107,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly definition: ProviderDefinition,
+    private readonly recordModelScopeRequest?: (summary: TransportRequestSummary) => void,
   ) {
     this.transportLog = new TransportSummaryLog(context, definition.vendor);
     this.transportLog.restore();
@@ -115,10 +115,14 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
 
   private getOutputChannel(): vscode.OutputChannel {
     if (!this.outputChannel) {
-      this.outputChannel = vscode.window.createOutputChannel("OpenCode");
+      this.outputChannel = vscode.window.createOutputChannel("ModelScope");
       this.context.subscriptions.push(this.outputChannel);
     }
     return this.outputChannel;
+  }
+
+  private authHeaders(_endpointKind: "messages" | "responses" | "google" | "chat-completions", apiKey: string): Record<string, string> {
+    return buildModelScopeAuthHeaders("chat-completions", apiKey);
   }
 
   private log(message: string): void {
@@ -126,7 +130,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
 
   private async getMetadataSnapshot(): Promise<CachedModelMetadataSnapshot> {
-    return getOpenCodeModelMetadata(this.context, this.getOutputChannel());
+    return getModelMetadata(this.context, this.getOutputChannel());
   }
 
   private resolveModelMetadata(modelId: string, snapshot: CachedModelMetadataSnapshot): ResolvedModelMetadata {
@@ -147,7 +151,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
 
   private async refreshMetadataAndModels(): Promise<void> {
-    await clearOpenCodeModelMetadataCache(this.context);
+    await clearModelMetadataCache(this.context);
     // Bypass the cache-first short-circuit so "Refresh Models" always
     // performs a real upstream fetch (issue #222).
     this.fetcher.invalidate();
@@ -157,22 +161,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
     await this.fetchModels(apiKey);
   }
 
-  /**
-   * Public entry point for the `OpenCode <Vendor>: Refresh Models` commands.
-   *
-   * CONTRACT:
-   * - Skips the Manage Provider QuickPick and goes straight to a fetch.
-   * - Reuses {@link refreshMetadataAndModels}, fires the change emitter so
-   *   VS Code re-resolves the picker, and surfaces an informational toast.
-   * - On missing API key, points the user at the BYOK flow instead of
-   *   prompting for a key (API keys are configured via Manage Language
-   *   Models / "+ Add Models" only).
-   *
-   * Background: this was added after issue #78 revealed that "Refresh Models"
-   * was only reachable as a sub-item inside `OpenCode Go: Manage Provider`
-   * (and Zen had no manual refresh path at all). The top-level command matches
-   * what users naturally type in the Command Palette.
-   */
+  /** Refresh the provider model list and notify VS Code. */
   async refreshModels(): Promise<void> {
     const apiKey = await this.context.secrets.get(secretKeyFor(this.baseVendor));
     if (!apiKey) {
@@ -269,7 +258,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   async provideLanguageModelChatInformation(
     options: vscode.PrepareLanguageModelChatModelOptions,
     token: vscode.CancellationToken,
-  ): Promise<OpenCodeModel[]> {
+  ): Promise<ModelScopeModel[]> {
     return provideModelChatInformation(this.modelInfoDeps(), options, token);
   }
 
@@ -298,6 +287,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
       baseVendor: this.baseVendor,
       definition: this.definition,
       transportLog: this.transportLog,
+      recordModelScopeRequest: this.recordModelScopeRequest,
       log: (message) => {
         this.log(message);
       },
@@ -309,7 +299,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
 
   async provideLanguageModelChatResponse(
-    model: OpenCodeModel,
+    model: ModelScopeModel,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
     options: vscode.ProvideLanguageModelChatResponseOptions,
     progress: vscode.Progress<vscode.LanguageModelResponsePart2>,
@@ -357,8 +347,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
-          authHeaders: buildOpenCodeGatewayAuthHeaders("messages", apiKey),
-          capacityLimitedModelNotes: CAPACITY_LIMITED_MODEL_NOTES,
+          authHeaders: this.authHeaders("messages", apiKey),
           onTransportSummary,
           stripThinkTags: settings.stripThinkTags,
           forceStripThinkTags,
@@ -373,7 +362,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
           apiKey,
           modelId: rawModelId,
           body: buildResponsesRequestBody(rawModelId, apiMessages, options, settings, metadata, limits),
-          authHeaders: buildOpenCodeGatewayAuthHeaders("responses", apiKey),
+          authHeaders: this.authHeaders("responses", apiKey),
           requestHeaders,
           progress,
           token,
@@ -382,7 +371,6 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
-          capacityLimitedModelNotes: CAPACITY_LIMITED_MODEL_NOTES,
           onTransportSummary,
           stripThinkTags: settings.stripThinkTags,
           forceStripThinkTags,
@@ -410,8 +398,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
-          authHeaders: buildOpenCodeGatewayAuthHeaders("google", apiKey),
-          capacityLimitedModelNotes: CAPACITY_LIMITED_MODEL_NOTES,
+          authHeaders: this.authHeaders("google", apiKey),
           onTransportSummary,
           stripThinkTags: settings.stripThinkTags,
           forceStripThinkTags,
@@ -429,7 +416,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
         apiKey,
         modelId: rawModelId,
         body: buildChatCompletionsRequestBody(rawModelId, apiMessages, options, settings, metadata, limits),
-        authHeaders: buildOpenCodeGatewayAuthHeaders("chat-completions", apiKey),
+        authHeaders: this.authHeaders("chat-completions", apiKey),
         requestHeaders,
         progress,
         token,
@@ -438,7 +425,6 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
         requestTimeoutMs: settings.requestTimeoutMs,
         streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
         contextWindowOutputBuffer,
-        capacityLimitedModelNotes: CAPACITY_LIMITED_MODEL_NOTES,
         onTransportSummary,
         stripThinkTags: settings.stripThinkTags,
         forceStripThinkTags,
@@ -451,7 +437,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
     } catch (error) {
       const message = getErrorMessage(error);
       this.log(`ERROR model=${model.id}: ${message}`);
-      if (error instanceof OpenCodeRequestError) {
+      if (error instanceof ModelScopeRequestError) {
         vscode.window.showErrorMessage(error.userMessage);
       }
       throw error;
@@ -459,7 +445,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
 
   provideTokenCount(
-    _model: OpenCodeModel,
+    _model: ModelScopeModel,
     text: string | vscode.LanguageModelChatRequestMessage,
     _token: vscode.CancellationToken,
   ): Promise<number> {
@@ -467,7 +453,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
   }
 
   /**
-   * Fetch the live model list from the OpenCode gateway.
+   * Fetch the live model list from ModelScope.
    *
    * CONTRACT:
    * - Resilient to transient network failures (DNS, TCP reset, connect
@@ -516,8 +502,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
       const metadataSnapshot = await this.getMetadataSnapshot();
       const filteredModelIds = uniqueModelIds.filter(
         (modelId) =>
-          !KNOWN_UNAVAILABLE_MODEL_IDS.has(modelId) &&
-          !shouldHideDeprecatedModel(modelId, this.baseVendor, metadataSnapshot, liveModelIds) &&
+          !shouldHideDeprecatedModel(modelId, this.definition.vendor, metadataSnapshot, liveModelIds) &&
           (this.definition.filterModel?.(modelId) ?? true),
       );
 
@@ -530,9 +515,7 @@ export class OpenCodeProvider implements vscode.LanguageModelChatProvider<OpenCo
     } catch (error) {
       const message = getErrorMessage(error);
       this.log(`Could not fetch model status metadata from models.dev. Applying local unavailable model filter only. ${message}`);
-      return uniqueModelIds.filter(
-        (modelId) => !KNOWN_UNAVAILABLE_MODEL_IDS.has(modelId) && (this.definition.filterModel?.(modelId) ?? true),
-      );
+      return uniqueModelIds.filter((modelId) => this.definition.filterModel?.(modelId) ?? true);
     }
   }
 }

@@ -12,7 +12,6 @@ import { lookupModelRegistryEntry } from "../core/registry";
 import { buildResponsesRequestEnvelope, pairResponsesFunctionCallItems, responsesInputItemsFromMessage } from "../responsesRequest";
 import { thinkingProviderFor } from "../thinking";
 import { sanitizeToolSchema } from "./schema";
-import { resolveProjectCacheKey } from "./headers";
 import { messagesHaveImages } from "./shared";
 import type { ResolvedModelMetadata } from "../models/metadata";
 import type { ModelLimits } from "../models/modelLimits";
@@ -40,10 +39,6 @@ export function buildChatCompletionsRequestBody(
     max_tokens: limits.maxOutputTokens,
     stream: true,
     stream_options: { include_usage: true },
-    ...(() => {
-      const k = resolveProjectCacheKey(modelId);
-      return k ? { prompt_cache_key: k } : {};
-    })(),
     ...thinkingPayload,
     ...(tools.length ? { tools, tool_choice: toolChoice(options.toolMode) } : {}),
   };
@@ -71,10 +66,6 @@ export function buildResponsesRequestBody(
     model: modelId,
     input,
     maxOutputTokens: limits.maxOutputTokens,
-    ...(() => {
-      const k = resolveProjectCacheKey(modelId);
-      return k ? { promptCacheKey: k } : {};
-    })(),
     // Muse Spark gateway requires `truncation: "disabled"` — requests whose
     // input exceeds the 1M context window will hard-fail (HTTP 400) instead
     // of being silently truncated upstream. This is a gateway constraint,

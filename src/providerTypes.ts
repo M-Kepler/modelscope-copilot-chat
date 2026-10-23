@@ -2,16 +2,35 @@ export const GO_VENDOR = "opencodego" as const;
 export const ZEN_VENDOR = "opencodezen" as const;
 export const AGENT_GO_VENDOR = "opencodego-agent" as const;
 export const AGENT_ZEN_VENDOR = "opencodezen-agent" as const;
+export const MODELSCOPE_CN_VENDOR = "modelscopecn" as const;
+export const MODELSCOPE_GLOBAL_VENDOR = "modelscopeglobal" as const;
+export const AGENT_MODELSCOPE_CN_VENDOR = "modelscopecn-agent" as const;
+export const AGENT_MODELSCOPE_GLOBAL_VENDOR = "modelscopeglobal-agent" as const;
 
-/** Base vendor IDs used for metadata lookups and API routing. */
-export type ProviderVendor = typeof GO_VENDOR | typeof ZEN_VENDOR;
+export type ModelScopeBaseVendor = typeof MODELSCOPE_CN_VENDOR | typeof MODELSCOPE_GLOBAL_VENDOR;
+export type ModelScopeProviderVendor = ModelScopeBaseVendor | typeof AGENT_MODELSCOPE_CN_VENDOR | typeof AGENT_MODELSCOPE_GLOBAL_VENDOR;
+export type OpenCodeBaseVendor = typeof GO_VENDOR | typeof ZEN_VENDOR;
+export type OpenCodeProviderVendor = OpenCodeBaseVendor | typeof AGENT_GO_VENDOR | typeof AGENT_ZEN_VENDOR;
+export type MetadataVendor = OpenCodeBaseVendor | ModelScopeBaseVendor;
+export type ProviderVendor = OpenCodeBaseVendor;
+export type AllProviderVendor = OpenCodeProviderVendor | ModelScopeProviderVendor;
 
-/** All vendor IDs including agent-host variants. */
-export type AllProviderVendor = typeof GO_VENDOR | typeof ZEN_VENDOR | typeof AGENT_GO_VENDOR | typeof AGENT_ZEN_VENDOR;
-
-/** Resolve agent-host vendor variants back to their base vendor for metadata/routing lookups. */
-export function resolveBaseVendor(vendor: AllProviderVendor): ProviderVendor {
-  return vendor === AGENT_GO_VENDOR ? GO_VENDOR : vendor === AGENT_ZEN_VENDOR ? ZEN_VENDOR : vendor;
+export function resolveBaseVendor(vendor: OpenCodeProviderVendor): OpenCodeBaseVendor;
+export function resolveBaseVendor(vendor: ModelScopeProviderVendor): ModelScopeBaseVendor;
+export function resolveBaseVendor(vendor: AllProviderVendor): ProviderVendor | ModelScopeBaseVendor;
+export function resolveBaseVendor(vendor: AllProviderVendor): ProviderVendor | ModelScopeBaseVendor {
+  switch (vendor) {
+    case AGENT_GO_VENDOR:
+      return GO_VENDOR;
+    case AGENT_ZEN_VENDOR:
+      return ZEN_VENDOR;
+    case AGENT_MODELSCOPE_CN_VENDOR:
+      return MODELSCOPE_CN_VENDOR;
+    case AGENT_MODELSCOPE_GLOBAL_VENDOR:
+      return MODELSCOPE_GLOBAL_VENDOR;
+    default:
+      return vendor;
+  }
 }
 
 export interface ProviderRoutingDefinition {
@@ -19,12 +38,6 @@ export interface ProviderRoutingDefinition {
   chatCompletionsUrl: string;
   messagesUrl: string;
   modelsUrl: string;
-  /**
-   * Base of the Google-native generate route (`{base}/{modelId}:streamGenerateContent`).
-   * Absent = same base as `modelsUrl` (Zen and custom gateways). Only Go's
-   * built-in gateway serves that route on a different base (issue #247 keeps a
-   * configured `apiBaseUrl` in charge of every route).
-   */
   googleModelsUrl?: string;
   responsesUrl?: string;
 }
