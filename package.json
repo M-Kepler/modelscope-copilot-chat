@@ -338,7 +338,7 @@
   "devDependencies": {
     "@types/node": "^26.4.0",
     "@types/vscode": "^1.125.0",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "editorconfig-checker": "^6.2.0",
     "eslint": "^10.8.1",
     "eslint-plugin-jsonc": "^3.4.1",
