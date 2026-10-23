@@ -1,4 +1,6 @@
 .gitignore
+.codegraph/**
+.superpowers/**
 .github/**
 .husky/**
 .markdownlint-cli2.json

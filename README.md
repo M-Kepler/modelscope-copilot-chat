@@ -13,6 +13,7 @@ check in, or send an inference request.
 
 - ModelScope China and Global model providers, including Agents-window
   provider variants.
+- Light/dark provider icons shown in the Chat model picker.
 - Live model discovery with cached and bundled fallbacks.
 - Per-model reasoning controls where the model supports them.
 - Native tool calling, streaming, image input for vision-capable models, and
@@ -70,6 +71,21 @@ endpoint. Global chat remains independent of Magicube balance.
 | `modelscope.streamIdleTimeoutSeconds` | `120`   | Maximum wait for the next streamed event.             |
 | `modelscope.stripThinkTags`           | `auto`  | Control removal of reasoning tags from output.        |
 | `modelscope.thinking.*`               | varies  | Default reasoning effort by model family.             |
+
+## Troubleshooting
+
+- **ModelScope is missing from Add Models or the Chat model picker.** Confirm
+  `modelscope.enabled` is `true` in your user settings; every provider
+  contribution is gated on that setting, so `false` hides ModelScope entirely.
+  Reload the window after changing it.
+- **Context size looks wrong for a model.** Sizes come from each model's own
+  `config.json` (`max_position_embeddings`), bundled as
+  `MODELSCOPE_CONTEXT_WINDOWS`. Models without a readable config — image-edit
+  endpoints and early-access previews — keep the 262K default, and
+  `MiniMax/MiniMax-M1-80k` is deliberately left on it because its config value is
+  implausible. `modelscope.maxInputTokens` overrides the resolved value for
+  **all** models, so set it only when every model you use shares the same real
+  limit.
 
 ## Magicube balance behavior
 

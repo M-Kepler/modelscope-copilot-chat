@@ -12,7 +12,16 @@ const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), "package.json
   contributes: {
     commands: { command: string }[];
     configuration: { properties: Record<string, unknown> };
-    languageModelChatProviders: { vendor: string; displayName: string }[];
+    languageModelChatProviders: {
+      vendor: string;
+      displayName: string;
+      icon?: { light: string; dark: string };
+      managementCommand?: string;
+      configuration?: {
+        type?: string;
+        properties?: Record<string, { type?: string; secret?: boolean }>;
+      };
+    }[];
   };
 };
 
@@ -41,6 +50,40 @@ describe("ModelScope package contributions", () => {
       "modelscopeglobal-agent": "ModelScope Global (Agents)",
     });
     assert.ok(providers.filter(({ vendor }) => vendor.endsWith("-agent")).every(({ displayName }) => displayName.includes("(Agents)")));
+  });
+
+  it("keeps the native Add Models flow available for base providers", () => {
+    const providers = packageJson.contributes.languageModelChatProviders;
+    assert.ok(providers.every(({ managementCommand }) => managementCommand === undefined));
+
+    for (const vendor of ["modelscopecn", "modelscopeglobal"]) {
+      const provider = providers.find((entry) => entry.vendor === vendor);
+      assert.ok(provider, `${vendor} provider should be contributed`);
+      const configuration = provider.configuration;
+      assert.ok(configuration, `${vendor} should expose native configuration`);
+      assert.equal(configuration.type, "object");
+      const properties = configuration.properties;
+      assert.ok(properties, `${vendor} should expose configuration properties`);
+      const apiKey = properties.apiKey;
+      assert.ok(apiKey, `${vendor} should expose an API key field`);
+      assert.equal(apiKey.type, "string");
+      assert.equal(apiKey.secret, true);
+    }
+
+    assert.ok(providers.filter(({ vendor }) => vendor.endsWith("-agent")).every(({ configuration }) => configuration === undefined));
+  });
+
+  it("declares a light and dark provider icon that exists on disk", () => {
+    const providers = packageJson.contributes.languageModelChatProviders;
+
+    for (const { vendor, icon } of providers) {
+      assert.ok(icon, `${vendor} should declare an icon`);
+      for (const variant of [icon.light, icon.dark]) {
+        // VS Code resolves these relative to the extension root and silently
+        // drops the icon when the file is missing.
+        assert.doesNotThrow(() => readFileSync(resolve(process.cwd(), variant)), `${vendor} icon ${variant} should exist`);
+      }
+    }
   });
 
   it("does not contribute OpenCode vendors, commands, or settings", () => {

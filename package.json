@@ -38,25 +38,57 @@
       {
         "vendor": "modelscopecn",
         "displayName": "ModelScope China",
-        "managementCommand": "modelscope.cn.manage",
+        "icon": {
+          "light": "media/modelscope-light.svg",
+          "dark": "media/modelscope-dark.svg"
+        },
+        "configuration": {
+          "type": "object",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "description": "ModelScope China API key.",
+              "secret": true
+            }
+          }
+        },
         "when": "config.modelscope.enabled"
       },
       {
         "vendor": "modelscopeglobal",
         "displayName": "ModelScope Global",
-        "managementCommand": "modelscope.global.manage",
+        "icon": {
+          "light": "media/modelscope-light.svg",
+          "dark": "media/modelscope-dark.svg"
+        },
+        "configuration": {
+          "type": "object",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "description": "ModelScope Global API key.",
+              "secret": true
+            }
+          }
+        },
         "when": "config.modelscope.enabled"
       },
       {
         "vendor": "modelscopecn-agent",
         "displayName": "ModelScope China (Agents)",
-        "managementCommand": "modelscope.cn.manage",
+        "icon": {
+          "light": "media/modelscope-light.svg",
+          "dark": "media/modelscope-dark.svg"
+        },
         "when": "config.modelscope.enabled && config.modelscope.agentsWindow"
       },
       {
         "vendor": "modelscopeglobal-agent",
         "displayName": "ModelScope Global (Agents)",
-        "managementCommand": "modelscope.global.manage",
+        "icon": {
+          "light": "media/modelscope-light.svg",
+          "dark": "media/modelscope-dark.svg"
+        },
         "when": "config.modelscope.enabled && config.modelscope.agentsWindow"
       }
     ],

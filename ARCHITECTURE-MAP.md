@@ -65,6 +65,22 @@ registered or exposed as a product feature here.
   catalogs so connection checks validate credentials rather than a retired ID.
 - Keep provider registration, VS Code manifest contributions and tests in
   sync when changing a vendor or command.
+- Base China/Global providers must use native `configuration` schemas and must
+  not declare `managementCommand`, so VS Code's Add Models flow can create BYOK
+  groups. Agents variants inherit the region key and are not Add Models entries.
+- Provider `when` clauses gate user-visible registration; a `false`
+  `modelscope.enabled` hides the providers from Add Models and Chat.
+- Every provider contribution declares `icon.light` / `icon.dark` as
+  extension-relative SVG paths; VS Code resolves them against the extension root
+  and silently drops the icon when a file is missing, so the packaging test
+  asserts both files exist.
+- models.dev publishes ModelScope under the single key `modelscope`; both
+  regions map to it. ModelScope's own model APIs expose no context metadata and
+  models.dev covers none of the current inference models, so the resolved limit
+  comes from `MODELSCOPE_CONTEXT_WINDOWS` in `src/models/modelTables.ts` —
+  values read from each model's own `config.json`. Ids absent from that table
+  keep `DEFAULT_MODEL_CONTEXT_WINDOW` (262K). Bump `MODEL_METADATA_REVISION`
+  only when limits actually change — a bump resets users' selected model id.
 
 ## Validation
 
