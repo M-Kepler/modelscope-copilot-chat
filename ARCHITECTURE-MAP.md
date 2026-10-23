@@ -33,7 +33,7 @@ registered or exposed as a product feature here.
 
 | Area                         | Files                                                                                                                                                                        | Responsibility                                                                                             |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Activation and contributions | [src/extension.ts](./src/extension.ts), [package.json](./package.json)                                                                                                       | Register four ModelScope vendors, commands, and `modelscope.*` settings.                                   |
+| Activation and contributions | [src/extension.ts](./src/extension.ts), [package.json](./package.json)                                                                                                       | Register four ModelScope vendors with distinct Agents labels, commands, and `modelscope.*` settings.       |
 | Provider and model discovery | [src/provider/](./src/provider), [src/providerTypes.ts](./src/providerTypes.ts)                                                                                              | China/Global endpoints, model listing, model information, key resolution and provider dialogs.             |
 | Chat preparation             | [src/provider/chatPrep.ts](./src/provider/chatPrep.ts), [src/provider/messages.ts](./src/provider/messages.ts), [src/provider/historyTrim.ts](./src/provider/historyTrim.ts) | Convert input, preserve reasoning/tool history, bound image/history payloads and calculate request limits. |
 | Model metadata               | [src/models/](./src/models), [src/core/registry.ts](./src/core/registry.ts)                                                                                                  | Model limits, capability metadata, family/thinking resolution and stable bundled fallbacks.                |
@@ -45,6 +45,9 @@ registered or exposed as a product feature here.
 
 - Only `modelscopecn`, `modelscopeglobal`, `modelscopecn-agent`, and
   `modelscopeglobal-agent` are contributed as language-model providers.
+- Agents providers use the `ModelScope China (Agents)` and
+  `ModelScope Global (Agents)` labels so they remain distinguishable from the
+  standard providers in VS Code.
 - Both regions use ModelScope's OpenAI-compatible chat-completions API and
   ModelScope authentication headers; no OpenCode client/session headers are
   sent.
