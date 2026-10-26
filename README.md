@@ -22,8 +22,9 @@ check in, or send an inference request.
   - **Magicubes**: available balance from the ModelScope China API.
   - **Request quota**: request limits reported in chat response headers.
   - **Tokens**: usage from the latest completed chat request.
-- Manual **ModelScope: Refresh Magicube Balance** command and five-minute
-  background refresh.
+- Manual **ModelScope: Refresh Magicube Balance** command, five-minute
+  background refresh, and a throttled refresh shortly after each completed
+  chat request.
 
 Request quota and Magicube balance are different values. Request-quota
 information may not appear until a model responds; Magicube balance is fetched
@@ -99,6 +100,11 @@ If a refresh fails, the status bar shows the error; a previously successful
 balance remains visible as stale rather than being replaced with zero. Use
 **ModelScope: Refresh Magicube Balance** or click the balance indicator to
 retry.
+
+A completed chat request consumes Magicubes, so the balance is refreshed again
+shortly after each request ends — throttled to at most once per minute, so a
+tool-call loop that issues many requests does not hit the balance endpoint
+once per request.
 
 ## Development
 

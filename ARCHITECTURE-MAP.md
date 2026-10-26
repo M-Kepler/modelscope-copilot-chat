@@ -57,6 +57,9 @@ registered or exposed as a product feature here.
 - Magicube balance, response request quotas, and token usage are separate
   status-bar values. Missing or failed data is not rendered as a successful
   zero balance.
+- The balance is refreshed on extension start, every five minutes, on manual
+  refresh, and shortly after each completed chat request (throttled to once
+  per minute so a tool-call loop does not hit the endpoint once per request).
 - Model-list, metadata and balance failures remain visible in diagnostics or
   status-bar state; successful cached data may be shown as stale.
 - Model-family and thinking-strategy lookup strips the owner prefix from

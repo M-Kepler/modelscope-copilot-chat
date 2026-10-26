@@ -4,6 +4,18 @@
 
 ---
 
+## ✅ Magicube Balance Refreshes After Each Completed Chat Request — 2026-10-20
+
+**Scope:** user-reported gap — the status-bar Magicube balance did not refresh after a request completed, so it went stale until the next five-minute timer or manual refresh. Only the token and request-quota indicators updated on request completion.
+
+**Fix:** `ModelScopeStatusBarController.recordRequest()` now calls a new throttled `refreshBalanceAfterRequest()` after updating the token/quota items. Throttle is `REQUEST_BALANCE_REFRESH_GAP_MS = 60 * 1000`, keyed off `lastAttemptAt` set at the start of every `refreshBalance()` call, so both successes and failures are rate-limited — a broken endpoint is retried at most once per minute, not once per request. Fire-and-forget with the existing error path, consistent with the timer path. `now?()` dependency hook makes the controller testable with a fake clock.
+
+**Tests:** new case in `src/test/modelScopeBalanceStatus.test.ts` ("refreshes the balance when a request completes, at most once per gap") using a fake clock and a `flush()` helper; **437/437 pass**, `npm run compile` clean, full lint gate (7 checks) green.
+
+Docs: README "Magicube balance behavior" + Features, CHANGELOG `[Unreleased]`, `ARCHITECTURE-MAP.md` security-and-privacy contract.
+
+---
+
 ## ✅ FIM Default Model Removed Upstream — inline suggestions silently dead — 2026-10-20
 
 **Scope:** inline suggestions produced nothing at all (reported via LinkedIn by Yannick Huebner), initially misread as Go budget exhaustion. `DEFAULT_INLINE_MODEL` (`qwen3.5-plus`) had been removed from the Go gateway, so every FIM request returned HTTP 400 `Model is unavailable` which the completion engine logs to the output channel and renders as nothing. The registry's deprecation filter never applied here: FIM sends the raw setting value straight to `/chat/completions`, bypassing the picker. This was the landmine doc 100 flagged on 2026-09-08 ("flagged, unchanged") — upstream finally dropped the model.

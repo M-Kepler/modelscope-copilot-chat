@@ -35,6 +35,9 @@ Notable changes to ModelScope for Copilot Chat are recorded here.
   profiles, inline completions, and vision-proxy configuration.
 - Model family and thinking-strategy detection now handles ModelScope model IDs
   with owner prefixes.
+- ModelScope Magicube balance now refreshes shortly after each completed chat
+  request (throttled to once per minute), so the status bar no longer lags
+  behind the balance until the next five-minute timer.
 
 ### Security and privacy
 
