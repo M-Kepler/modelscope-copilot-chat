@@ -130,6 +130,30 @@
           "default": true,
           "description": "Enable ModelScope chat providers."
         },
+        "modelscope.inlineSuggestions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable inline code completions (ghost text) in editors. Requires a signed-in ModelScope provider."
+        },
+        "modelscope.inlineCompletionModel": {
+          "type": "string",
+          "default": "Qwen/Qwen3.5-27B",
+          "description": "ModelScope model id used for inline completions. Must support non-thinking mode."
+        },
+        "modelscope.inlineCompletionDebounceMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "maximum": 2000,
+          "description": "Debounce window (ms) between keystrokes before an inline completion fires."
+        },
+        "modelscope.inlineCompletionMaxTokens": {
+          "type": "number",
+          "default": 128,
+          "minimum": 1,
+          "maximum": 1024,
+          "description": "Maximum output tokens for an inline completion."
+        },
         "modelscope.agentsWindow": {
           "type": "boolean",
           "default": true,

@@ -19,6 +19,10 @@ Notable changes to ModelScope for Copilot Chat are recorded here.
   advertise the 262K default.
 - Light/dark provider icons for the Chat model picker, contributed through the
   `languageModelChatProviders` `icon` field.
+- Ghost-text inline completions while typing (issue #49). Opt-in via
+  `modelscope.inlineSuggestions` (default `false`); registered for all four
+  ModelScope vendors; 300ms debounce, 3s timeout, 10-line prefix / 300-char
+  suffix window, FIM emulation over `/chat/completions`.
 
 ### Changed
 
@@ -32,7 +36,8 @@ Notable changes to ModelScope for Copilot Chat are recorded here.
 - The China and Global providers now use VS Code's native Add Models API-key
   configuration flow.
 - Removed OpenCode Go/Zen providers, Go usage tracking, usage dashboard,
-  profiles, inline completions, and vision-proxy configuration.
+  profiles, and vision-proxy configuration. (Inline completions were re-added
+  in this release — see the entry under **Added**.)
 - Model family and thinking-strategy detection now handles ModelScope model IDs
   with owner prefixes.
 - ModelScope Magicube balance now refreshes shortly after each completed chat

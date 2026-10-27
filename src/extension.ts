@@ -1,16 +1,18 @@
 import * as vscode from "vscode";
+import { registerInlineCompletions } from "./autocomplete/index";
 import { showModelPickerDiagnostics } from "./commands/diagnostics";
 import { showThinkingEffortPicker } from "./commands/thinkingPicker";
-import { CONFIG_SECTION, MODELSCOPE_CN_SECRET_KEY, SETTING_AGENTS_WINDOW, SETTING_ENABLED } from "./config";
-import { ModelScopeStatusBarController } from "./modelscope/statusBar";
-import { MODELSCOPE_PROVIDERS } from "./provider/definitions";
-import { ModelScopeProvider } from "./provider/ModelScopeProvider";
 import {
   AGENT_MODELSCOPE_CN_VENDOR,
   AGENT_MODELSCOPE_GLOBAL_VENDOR,
   MODELSCOPE_CN_VENDOR,
   MODELSCOPE_GLOBAL_VENDOR,
+  type ModelScopeProviderVendor,
 } from "./providerTypes";
+import { CONFIG_SECTION, MODELSCOPE_CN_SECRET_KEY, SETTING_AGENTS_WINDOW, SETTING_ENABLED } from "./config";
+import { ModelScopeStatusBarController } from "./modelscope/statusBar";
+import { MODELSCOPE_PROVIDERS } from "./provider/definitions";
+import { ModelScopeProvider } from "./provider/ModelScopeProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
   const statusBar = startModelScopeStatusBars(context, async () => context.secrets.get(MODELSCOPE_CN_SECRET_KEY));
@@ -64,6 +66,16 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     }
   }
+
+  // Inline completions (ghost text / FIM) — opt-in, registered for every
+  // ModelScope vendor so the user can pick a region via the picker.
+  const inlineVendors: ModelScopeProviderVendor[] = [
+    MODELSCOPE_CN_VENDOR,
+    MODELSCOPE_GLOBAL_VENDOR,
+    AGENT_MODELSCOPE_CN_VENDOR,
+    AGENT_MODELSCOPE_GLOBAL_VENDOR,
+  ];
+  context.subscriptions.push(...registerInlineCompletions(context, inlineVendors));
 
   context.subscriptions.push(
     vscode.commands.registerCommand("modelscope.cn.manage", () => providers[MODELSCOPE_CN_VENDOR].manage()),

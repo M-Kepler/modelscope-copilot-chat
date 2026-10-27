@@ -71,6 +71,27 @@ export const TEST_CONNECTION_TIMEOUT_MS = 30_000;
 /** Per-request timeout for the inline completion engine. */
 export const COMPLETION_REQUEST_TIMEOUT_MS = 3_000;
 
+// ─── Inline completions (issue #49) ──────────────────────────────────────────
+
+/** Default debounce window (ms) between keystrokes before a completion fires. */
+export const DEFAULT_INLINE_DEBOUNCE_MS = 300;
+/** Default max tokens the completion engine may produce. */
+export const DEFAULT_INLINE_MAX_TOKENS = 128;
+/** Default number of prefix lines the completion engine keeps. */
+export const DEFAULT_INLINE_PREFIX_LINES = 10;
+/** Default number of suffix characters the completion engine keeps. */
+export const DEFAULT_INLINE_SUFFIX_CHARS = 300;
+/** Default ModelScope model id used for inline completions (non-thinking). */
+export const DEFAULT_INLINE_COMPLETION_MODEL = "Qwen/Qwen3.5-27B";
+/** Setting key for the opt-in inline-completion toggle. */
+export const INLINE_SUGGESTIONS_SETTING = "inlineSuggestions";
+/** Setting key for the user-configured inline-completion model id. */
+export const INLINE_SUGGESTIONS_MODEL_SETTING = "inlineCompletionModel";
+/** Setting key for the debounce window (ms). */
+export const INLINE_DEBOUNCE_MS_SETTING = "inlineCompletionDebounceMs";
+/** Setting key for the max output tokens. */
+export const INLINE_MAX_TOKENS_SETTING = "inlineCompletionMaxTokens";
+
 // ─── Model-list fetch resilience (issue #78) ─────────────────────────────────
 
 /** Max retry attempts for transient network failures during model-list fetch. */
