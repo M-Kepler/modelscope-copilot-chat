@@ -60,3 +60,15 @@ Notable changes to ModelScope for Copilot Chat are recorded here.
   `modelscopecn`/`modelscopeglobal` provider keys instead of `modelscope`.
   ModelScope models still show the 262K default because models.dev does not
   describe any model in the current inference catalog.
+- Fixed inline completions never reaching ModelScope: the request URL repeated
+  `/v1/chat/completions`, and one provider per vendor meant the same prompt was
+  sent to China and Global (twice each) on every keystroke. A single provider
+  now resolves the region from the first stored API key.
+- Inline completions now log every completed request (vendor, model, HTTP
+  status, `durationMs`, characters or error) to the **ModelScope** output
+  channel instead of failing silently, and honor
+  `modelscope.inlineCompletionDebounceMs` / `inlineCompletionMaxTokens` — both
+  were read but never applied (the engine always got 128 tokens and no
+  debounce).
+- The chat provider and inline completions now share one **ModelScope** output
+  channel instead of creating a separate channel per provider instance.

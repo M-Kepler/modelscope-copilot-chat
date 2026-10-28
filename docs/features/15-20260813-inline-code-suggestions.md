@@ -1,5 +1,11 @@
 **Status:** 🟢 Active
 
+> ⚠️ **Predecessor doc.** This file describes the OpenCode era (`opencodego.*`
+> settings, "OpenCode Completions" channel, usage panel). The ModelScope port
+> keeps the `src/autocomplete/` engine but uses `modelscope.*` settings, logs to
+> the shared **ModelScope** channel and applies the configured debounce — see
+> [`../issues/117-20261028-commit-message-and-inline-suggestion-support.md`](../issues/117-20261028-commit-message-and-inline-suggestion-support.md).
+
 # Inline Code Suggestions (Ghost Text) — Experimental (#49)
 
 **Topic:** autocomplete / inline-completions / ghost-text / fim / qwen / provider

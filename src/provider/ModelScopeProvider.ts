@@ -37,6 +37,7 @@ import { estimateChatMessageTokenCount } from "./tokens";
 import { modelLimits, resolveRawModelId, shouldHideDeprecatedModel } from "./settings";
 
 import { getErrorMessage } from "../utils";
+import { modelScopeOutputChannel } from "../core/modelScopeOutput";
 import type { MagicubeBalanceResult } from "../modelscope/balance";
 
 import { prepareChatRequest, type ChatPrepDeps } from "./chatPrep";
@@ -76,7 +77,6 @@ export class ModelScopeProvider implements vscode.LanguageModelChatProvider<Mode
   /** Capped to prevent unbounded growth across long sessions. */
   private readonly reasoningContentByToolCallId = new Map<string, string>();
   private readonly liveModelMetadataById = new Map<string, ModelMetadataFields>();
-  private outputChannel: vscode.OutputChannel | undefined;
 
   /**
    * Cached snapshot of the most recent successful model-list fetch for this
@@ -118,11 +118,7 @@ export class ModelScopeProvider implements vscode.LanguageModelChatProvider<Mode
   }
 
   private getOutputChannel(): vscode.OutputChannel {
-    if (!this.outputChannel) {
-      this.outputChannel = vscode.window.createOutputChannel("ModelScope");
-      this.context.subscriptions.push(this.outputChannel);
-    }
-    return this.outputChannel;
+    return modelScopeOutputChannel(this.context);
   }
 
   private authHeaders(_endpointKind: "messages" | "responses" | "google" | "chat-completions", apiKey: string): Record<string, string> {

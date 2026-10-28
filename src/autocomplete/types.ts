@@ -23,6 +23,10 @@ export interface CompletionResult {
   text: string | undefined;
   /** Completion latency, for diagnostics. */
   durationMs: number;
+  /** HTTP status of the completion request, when a response was received. */
+  status?: number;
+  /** Failure reason (`HTTP 429 …`, `timeout`, `cancelled`, …), for diagnostics. */
+  error?: string;
 }
 
 export interface CompletionEngine {
